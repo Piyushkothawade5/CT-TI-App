@@ -15,7 +15,7 @@ import type { TiRecordInput, CoreData } from "@/api-client";
 import { useQueryClient } from "@tanstack/react-query";
 import { SearchModal } from "@/components/ti-form/SearchModal";
 import { AddItemModal } from "@/components/ti-form/AddItemModal";
-import { downloadTiPdf } from "@/components/ti-form/downloadTiPdf";
+import { downloadTiPdf, printTiPdf } from "@/components/ti-form/downloadTiPdf";
 
 const CORE_FIELDS: Array<{
   label: string;
@@ -385,6 +385,16 @@ export default function Home() {
     }
   };
 
+  const handlePrintPdf = async () => {
+    const data = form.getValues();
+    const tiNo = currentTiNo || draftTiNo || "";
+    try {
+      await printTiPdf({ ...data, ti_no: tiNo });
+    } catch (err) {
+      toast({ title: "PDF generation failed", description: String(err), variant: "destructive" });
+    }
+  };
+
   return (
     <div className="flex min-h-screen bg-gray-100">
       {/* Sidebar Toolbar */}
@@ -395,7 +405,7 @@ export default function Home() {
         <SidebarButton icon={<ChevronLeft />} title="Prev" onClick={handlePrev} />
         <SidebarButton icon={<ChevronRight />} title="Next" onClick={handleNext} />
         <SidebarButton icon={<Edit3 />} title="Edit" onClick={handleEdit} disabled={!currentTiNo || isEditMode} />
-        <SidebarButton icon={<Printer />} title="Print" onClick={handleDownloadPdf} />
+        <SidebarButton icon={<Printer />} title="Print" onClick={handlePrintPdf} />
         <SidebarButton icon={<FileText />} title="PDF" onClick={handleDownloadPdf} />
       </div>
 
