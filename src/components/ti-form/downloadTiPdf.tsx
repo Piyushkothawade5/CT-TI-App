@@ -16,3 +16,16 @@ export async function downloadTiPdf(
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
+
+export async function printTiPdf(
+  data: TiRecordInput & { ti_no?: string | null }
+): Promise<void> {
+  const blob = await pdf(<TiPdfDocument data={data} />).toBlob();
+  const url = URL.createObjectURL(blob);
+  const newWindow = window.open(url, "_blank");
+  if (newWindow) {
+    newWindow.onload = () => {
+      newWindow.print();
+    };
+  }
+}
