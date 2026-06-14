@@ -7,11 +7,11 @@ const BLACK = "#000000";
 const s = StyleSheet.create({
   page: {
     fontFamily: "Helvetica",
-    fontSize: 7,
-    paddingTop: 12,
-    paddingBottom: 12,
-    paddingLeft: 18,
-    paddingRight: 18,
+    fontSize: 8,
+    paddingTop: 18,
+    paddingBottom: 18,
+    paddingLeft: 22,
+    paddingRight: 22,
     color: BLACK,
   },
 
@@ -21,17 +21,17 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: BLACK,
     borderStyle: "solid",
-    paddingHorizontal: 6,
-    paddingVertical: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
     marginBottom: 0,
     alignItems: "center",
   },
   headerLeft: { flex: 1, alignItems: "center" },
-  headerTitle: { fontSize: 10, fontFamily: "Helvetica-Bold", letterSpacing: 0.5 },
-  headerSub: { fontSize: 8, marginTop: 1 },
+  headerTitle: { fontSize: 11, fontFamily: "Helvetica-Bold", letterSpacing: 0.5 },
+  headerSub: { fontSize: 9, marginTop: 2 },
   headerRight: { flex: 1, alignItems: "flex-end" },
-  headerField: { flexDirection: "row", marginBottom: 2 },
-  headerLabel: { fontFamily: "Helvetica-Bold", marginRight: 3, fontSize: 7 },
+  headerField: { flexDirection: "row", marginBottom: 3 },
+  headerLabel: { fontFamily: "Helvetica-Bold", marginRight: 4 },
 
   // ── Info table ────────────────────────────────────────────
   infoTable: {
@@ -47,27 +47,27 @@ const s = StyleSheet.create({
     borderBottomWidth: 1,
     borderColor: BLACK,
     borderStyle: "solid",
-    minHeight: 16,
+    minHeight: 20,
   },
   infoRowLast: {
     flexDirection: "row",
-    minHeight: 16,
+    minHeight: 20,
   },
   infoCell: {
     flex: 1,
-    paddingHorizontal: 3,
-    paddingVertical: 2,
+    paddingHorizontal: 5,
+    paddingVertical: 3,
     borderRightWidth: 1,
     borderColor: BLACK,
     borderStyle: "solid",
   },
   infoCellLast: {
     flex: 1,
-    paddingHorizontal: 3,
-    paddingVertical: 2,
+    paddingHorizontal: 5,
+    paddingVertical: 3,
   },
-  infoLabel: { fontFamily: "Helvetica-Bold", fontSize: 6.5 },
-  infoValue: { fontSize: 7, marginTop: 0.5 },
+  infoLabel: { fontFamily: "Helvetica-Bold", fontSize: 7.5 },
+  infoValue: { fontSize: 8, marginTop: 1 },
 
   // ── Electric row ──────────────────────────────────────────
   electricRow: {
@@ -77,23 +77,23 @@ const s = StyleSheet.create({
     borderBottomWidth: 1,
     borderColor: BLACK,
     borderStyle: "solid",
-    minHeight: 18,
+    minHeight: 24,
   },
   eCell: {
     flex: 1,
-    paddingHorizontal: 3,
-    paddingVertical: 2,
+    paddingHorizontal: 4,
+    paddingVertical: 3,
     borderRightWidth: 1,
     borderColor: BLACK,
     borderStyle: "solid",
   },
   eCellLast: {
     flex: 1,
-    paddingHorizontal: 3,
-    paddingVertical: 2,
+    paddingHorizontal: 4,
+    paddingVertical: 3,
   },
-  eCellLabel: { fontFamily: "Helvetica-Bold", fontSize: 6.5 },
-  eCellValue: { fontSize: 7, marginTop: 0.5 },
+  eCellLabel: { fontFamily: "Helvetica-Bold", fontSize: 7.5 },
+  eCellValue: { fontSize: 8, marginTop: 1 },
 
   // ── Core Particulars table ────────────────────────────────
   coreTable: {
@@ -103,7 +103,7 @@ const s = StyleSheet.create({
     borderBottomWidth: 0,
     borderColor: BLACK,
     borderStyle: "solid",
-    marginTop: 3,
+    marginTop: 4,
   },
   coreHeaderRow: {
     flexDirection: "row",
@@ -117,82 +117,84 @@ const s = StyleSheet.create({
     borderBottomWidth: 1,
     borderColor: BLACK,
     borderStyle: "solid",
-    minHeight: 12,
+    minHeight: 14,
   },
   colLabel: {
     width: "34%",
-    paddingHorizontal: 3,
-    paddingVertical: 1,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
     borderRightWidth: 1,
     borderColor: BLACK,
     borderStyle: "solid",
   },
   colCore: {
     flex: 1,
-    paddingHorizontal: 3,
-    paddingVertical: 1,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
     borderRightWidth: 1,
     borderColor: BLACK,
     borderStyle: "solid",
   },
   colCoreLast: {
     flex: 1,
-    paddingHorizontal: 3,
-    paddingVertical: 1,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
   },
   colSpanned: {
     flex: 3,
-    paddingHorizontal: 3,
-    paddingVertical: 1,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
   },
 
-  // ── Notes & Revision ───────────────────────────────────────
-  notesSection: {
-    marginTop: 3,
+  // ── Notes & Revision ──────────────────────────────────────
+  noteTable: {
     borderLeftWidth: 1,
     borderRightWidth: 1,
     borderBottomWidth: 1,
     borderTopWidth: 1,
     borderColor: BLACK,
     borderStyle: "solid",
-  },
-  notesRow: {
+    marginTop: 6,
     flexDirection: "row",
-    borderBottomWidth: 1,
-    borderColor: BLACK,
-    borderStyle: "solid",
-    minHeight: 14,
+    minHeight: 36,
   },
-  notesRowLast: {
-    flexDirection: "row",
-    minHeight: 14,
-  },
-  notesCell: {
-    flex: 1,
-    paddingHorizontal: 3,
-    paddingVertical: 1,
+  noteCell: {
+    flex: 4,
+    paddingHorizontal: 5,
+    paddingVertical: 3,
     borderRightWidth: 1,
     borderColor: BLACK,
     borderStyle: "solid",
   },
-  notesCellLast: {
-    flex: 3,
-    paddingHorizontal: 3,
-    paddingVertical: 1,
+  revCell: {
+    flex: 1,
+    paddingHorizontal: 5,
+    paddingVertical: 3,
   },
-  notesLabel: { fontFamily: "Helvetica-Bold", fontSize: 6.5 },
-  notesValue: { fontSize: 7, marginTop: 0.5 },
+  noteLabel: { fontFamily: "Helvetica-Bold", fontSize: 7.5, marginBottom: 2 },
+  noteValue: { fontSize: 8, lineHeight: 1.3 },
 
   // ── Signatures ────────────────────────────────────────────
   sigRow: {
     flexDirection: "row",
-    marginTop: 3,
+    marginTop: 18,
+    paddingTop: 4,
+  },
+  sigCell: {
+    flex: 1,
+    alignItems: "center",
+    paddingHorizontal: 4,
+  },
+  sigName: { fontSize: 9, marginBottom: 18, fontFamily: "Helvetica-Bold" },
+  sigLine: {
     borderTopWidth: 1,
     borderColor: BLACK,
     borderStyle: "solid",
-    paddingTop: 2,
+    width: "85%",
+    marginTop: 2,
+    paddingTop: 3,
   },
-  sigCell: { flex: 1 },
+  sigLabel: { fontSize: 8, fontFamily: "Helvetica-Bold", textAlign: "center" },
 
   bold: { fontFamily: "Helvetica-Bold" },
   center: { textAlign: "center" },
@@ -423,38 +425,36 @@ export function TiPdfDocument({ data }: Props) {
         </View>
 
         {/* ── Notes & Revision ── */}
-        <View style={s.notesSection}>
-          <View style={s.notesRow}>
-            <View style={s.notesCell}>
-              <Text style={s.notesLabel}>REV NO.</Text>
-              <Text style={s.notesValue}>{v(data.rev_no)}</Text>
-            </View>
-            <View style={s.notesCellLast}>
-              <Text style={s.notesLabel}>NOTE</Text>
-              <Text style={s.notesValue}>{v(data.note)}</Text>
-            </View>
+        <View style={s.noteTable}>
+          <View style={s.noteCell}>
+            <Text style={s.noteLabel}>NOTE</Text>
+            <Text style={s.noteValue}>{v(data.note)}</Text>
+          </View>
+          <View style={s.revCell}>
+            <Text style={s.noteLabel}>REV NO.</Text>
+            <Text style={s.noteValue}>{v(data.rev_no)}</Text>
           </View>
         </View>
 
         {/* ── Signatures ── */}
         <View style={s.sigRow}>
           <View style={s.sigCell}>
-            <Text>
-              <Text style={s.bold}>Created By :- </Text>
-              {v(data.created_by)}
-            </Text>
+            <Text style={s.sigName}>{v(data.created_by)}</Text>
+            <View style={s.sigLine}>
+              <Text style={s.sigLabel}>Created By</Text>
+            </View>
           </View>
           <View style={s.sigCell}>
-            <Text>
-              <Text style={s.bold}>Checked By :- </Text>
-              {v(data.checked_by)}
-            </Text>
+            <Text style={s.sigName}>{v(data.checked_by)}</Text>
+            <View style={s.sigLine}>
+              <Text style={s.sigLabel}>Checked By</Text>
+            </View>
           </View>
           <View style={s.sigCell}>
-            <Text>
-              <Text style={s.bold}>Approved By :- </Text>
-              {v(data.approved_by)}
-            </Text>
+            <Text style={s.sigName}>{v(data.approved_by)}</Text>
+            <View style={s.sigLine}>
+              <Text style={s.sigLabel}>Approved By</Text>
+            </View>
           </View>
         </View>
 
