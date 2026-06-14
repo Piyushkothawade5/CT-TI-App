@@ -41,7 +41,7 @@ const CORE_FIELDS = [
 export function AddItemModal({ open, onOpenChange, itemNo, onSuccess }: { open: boolean, onOpenChange: (open: boolean) => void, itemNo: string, onSuccess: () => void }) {
   const { toast } = useToast();
   const createItemMutation = useCreateItem();
-  
+
   const form = useForm<ItemInput>({
     defaultValues: {
       item_no: itemNo
@@ -63,6 +63,71 @@ export function AddItemModal({ open, onOpenChange, itemNo, onSuccess }: { open: 
     }
   };
 
+  // ── Arrow-key navigation ───────────────────────────────
+  const NUM_CORE_ROWS = CORE_FIELDS.length;
+  const NUM_CORE_COLS = 3;
+
+  const handleArrowKey = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const ARROWS = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Enter"];
+    if (!ARROWS.includes(e.key)) return;
+
+    const target = e.target as HTMLElement;
+    const tag = target.tagName.toLowerCase();
+    if (tag !== "input" && tag !== "textarea" && tag !== "select") return;
+
+    const gridRow = target.dataset.gridRow !== undefined ? parseInt(target.dataset.gridRow) : null;
+    const gridCol = target.dataset.gridCol !== undefined ? parseInt(target.dataset.gridCol) : null;
+
+    if (gridRow !== null && gridCol !== null) {
+      // ── 2-D navigation inside the Core Particulars table ──
+      e.preventDefault();
+      let nr = gridRow, nc = gridCol;
+      switch (e.key) {
+        case "ArrowDown":
+        case "Enter":
+          // Special case: if on last row (Wire Colour) and ENTER is pressed, jump to CT Final Dim
+          if (e.key === "Enter" && gridRow === NUM_CORE_ROWS - 1) {
+            const ctFinalDim = document.querySelector<HTMLElement>('[data-field="ct_final_dim"]');
+            ctFinalDim?.focus();
+            return;
+          }
+          nr = Math.min(gridRow + 1, NUM_CORE_ROWS - 1);
+          break;
+        case "ArrowUp":
+          nr = Math.max(gridRow - 1, 0);
+          break;
+        case "ArrowRight":
+          if (gridCol < NUM_CORE_COLS - 1) { nc = gridCol + 1; }
+          else if (gridRow < NUM_CORE_ROWS - 1) { nr = gridRow + 1; nc = 0; }
+          break;
+        case "ArrowLeft":
+          if (gridCol > 0) { nc = gridCol - 1; }
+          else if (gridRow > 0) { nr = gridRow - 1; nc = NUM_CORE_COLS - 1; }
+          break;
+      }
+      const next = document.querySelector<HTMLElement>(
+        `[data-grid-row="${nr}"][data-grid-col="${nc}"]`
+      );
+      next?.focus();
+    } else {
+      // ── Linear navigation for all other fields ──────────
+      const form = target.closest("#add-item-form");
+      if (!form) return;
+      const all = Array.from(
+        form.querySelectorAll<HTMLElement>(
+          "input:not([disabled]), select:not([disabled]), textarea:not([disabled])"
+        )
+      );
+      const idx = all.indexOf(target);
+      if (idx === -1) return;
+      const isNext = e.key === "ArrowDown" || e.key === "ArrowRight" || e.key === "Enter";
+      const isPrev = e.key === "ArrowUp" || e.key === "ArrowLeft";
+      if (isNext && idx < all.length - 1) { e.preventDefault(); all[idx + 1].focus(); }
+      if (isPrev && idx > 0) { e.preventDefault(); all[idx - 1].focus(); }
+    }
+  };
+  // ────────────────────────────────────────────────────────
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-5xl max-h-[90vh] flex flex-col p-0 overflow-hidden">
@@ -72,9 +137,9 @@ export function AddItemModal({ open, onOpenChange, itemNo, onSuccess }: { open: 
             Item No. <span className="font-bold text-gray-900">{itemNo}</span> does not exist in the database. Please provide item details to add it to the database.
           </DialogDescription>
         </DialogHeader>
-        
-        <ScrollArea className="flex-1 p-6 bg-gray-50/50">
-          <div className="space-y-8 pb-6">
+
+        <div onKeyDown={handleArrowKey} className="flex-1 overflow-y-auto p-6 bg-gray-50/50">
+          <div id="add-item-form" className="space-y-8 pb-6">
             
             <section>
               <h3 className="text-[#4a6fa5] font-bold tracking-wide text-sm mb-4 border-l-4 border-[#4a6fa5] pl-3">BASIC DETAILS</h3>
@@ -90,7 +155,7 @@ export function AddItemModal({ open, onOpenChange, itemNo, onSuccess }: { open: 
                     control={form.control}
                     render={({ field }) => (
                       <Select value={field.value || ""} onValueChange={field.onChange}>
-                        <SelectTrigger className="h-9 bg-white">
+                        <SelectTrigger className="h-9 bg-white" onKeyDown={handleArrowKey}>
                           <SelectValue placeholder="Select CT Type" />
                         </SelectTrigger>
                         <SelectContent>
@@ -113,7 +178,7 @@ export function AddItemModal({ open, onOpenChange, itemNo, onSuccess }: { open: 
                     name="cust_part_code"
                     control={form.control}
                     render={({ field }) => (
-                      <Input {...field} value={field.value || ""} className="bg-white" />
+                      <Input {...field} value={field.value || ""} onKeyDown={handleArrowKey} className="bg-white" />
                     )}
                   />
                 </div>
@@ -123,7 +188,7 @@ export function AddItemModal({ open, onOpenChange, itemNo, onSuccess }: { open: 
                     name="ratio"
                     control={form.control}
                     render={({ field }) => (
-                      <Input {...field} value={field.value || ""} className="bg-white" />
+                      <Input {...field} value={field.value || ""} onKeyDown={handleArrowKey} className="bg-white" />
                     )}
                   />
                 </div>
@@ -133,7 +198,7 @@ export function AddItemModal({ open, onOpenChange, itemNo, onSuccess }: { open: 
                     name="rated_voltage"
                     control={form.control}
                     render={({ field }) => (
-                      <Input {...field} value={field.value || ""} className="bg-white" />
+                      <Input {...field} value={field.value || ""} onKeyDown={handleArrowKey} className="bg-white" />
                     )}
                   />
                 </div>
@@ -143,7 +208,7 @@ export function AddItemModal({ open, onOpenChange, itemNo, onSuccess }: { open: 
                     name="stc"
                     control={form.control}
                     render={({ field }) => (
-                      <Input {...field} value={field.value || ""} className="bg-white" />
+                      <Input {...field} value={field.value || ""} onKeyDown={handleArrowKey} className="bg-white" />
                     )}
                   />
                 </div>
@@ -153,7 +218,7 @@ export function AddItemModal({ open, onOpenChange, itemNo, onSuccess }: { open: 
                     name="insulation_level"
                     control={form.control}
                     render={({ field }) => (
-                      <Input {...field} value={field.value || ""} className="bg-white" />
+                      <Input {...field} value={field.value || ""} onKeyDown={handleArrowKey} className="bg-white" />
                     )}
                   />
                 </div>
@@ -163,7 +228,7 @@ export function AddItemModal({ open, onOpenChange, itemNo, onSuccess }: { open: 
                     name="frequency"
                     control={form.control}
                     render={({ field }) => (
-                      <Input {...field} value={field.value || ""} className="bg-white" />
+                      <Input {...field} value={field.value || ""} onKeyDown={handleArrowKey} className="bg-white" />
                     )}
                   />
                 </div>
@@ -173,7 +238,7 @@ export function AddItemModal({ open, onOpenChange, itemNo, onSuccess }: { open: 
                     name="ref_std"
                     control={form.control}
                     render={({ field }) => (
-                      <Input {...field} value={field.value || ""} className="bg-white" />
+                      <Input {...field} value={field.value || ""} onKeyDown={handleArrowKey} className="bg-white" />
                     )}
                   />
                 </div>
@@ -200,17 +265,17 @@ export function AddItemModal({ open, onOpenChange, itemNo, onSuccess }: { open: 
                         </td>
                         <td className="p-0 border-r border-[#dee2e6]">
                           <Controller name={`core1.${row.key}` as any} control={form.control} render={({field}) => (
-                            <Input {...field} value={field.value || ""} className="border-0 shadow-none h-8 rounded-none focus-visible:ring-1 focus-visible:ring-[#4a6fa5] bg-transparent px-3" />
+                            <Input {...field} value={field.value || ""} data-grid-row={idx} data-grid-col={0} onKeyDown={handleArrowKey} className="border-0 shadow-none h-8 rounded-none focus-visible:ring-1 focus-visible:ring-[#4a6fa5] bg-transparent px-3" />
                           )} />
                         </td>
                         <td className="p-0 border-r border-[#dee2e6]">
                           <Controller name={`core2.${row.key}` as any} control={form.control} render={({field}) => (
-                            <Input {...field} value={field.value || ""} className="border-0 shadow-none h-8 rounded-none focus-visible:ring-1 focus-visible:ring-[#4a6fa5] bg-transparent px-3" />
+                            <Input {...field} value={field.value || ""} data-grid-row={idx} data-grid-col={1} onKeyDown={handleArrowKey} className="border-0 shadow-none h-8 rounded-none focus-visible:ring-1 focus-visible:ring-[#4a6fa5] bg-transparent px-3" />
                           )} />
                         </td>
                         <td className="p-0">
                           <Controller name={`core3.${row.key}` as any} control={form.control} render={({field}) => (
-                            <Input {...field} value={field.value || ""} className="border-0 shadow-none h-8 rounded-none focus-visible:ring-1 focus-visible:ring-[#4a6fa5] bg-transparent px-3" />
+                            <Input {...field} value={field.value || ""} data-grid-row={idx} data-grid-col={2} onKeyDown={handleArrowKey} className="border-0 shadow-none h-8 rounded-none focus-visible:ring-1 focus-visible:ring-[#4a6fa5] bg-transparent px-3" />
                           )} />
                         </td>
                       </tr>
@@ -224,7 +289,7 @@ export function AddItemModal({ open, onOpenChange, itemNo, onSuccess }: { open: 
               <h3 className="text-[#4a6fa5] font-bold tracking-wide text-sm mb-4 border-l-4 border-[#4a6fa5] pl-3">ADDITIONAL DETAILS</h3>
               <div className="grid grid-cols-4 gap-4">
                 {[
-                  { label: "CT Final Dim", key: "ct_final_dim" },
+                  { label: "CT Final Dim", key: "ct_final_dim", dataField: "ct_final_dim" },
                   { label: "GA Drg", key: "ga_drg" },
                   { label: "INS Class", key: "ins_class" },
                   { label: "Ref TI", key: "ref_ti" },
@@ -242,7 +307,7 @@ export function AddItemModal({ open, onOpenChange, itemNo, onSuccess }: { open: 
                       name={field.key as any}
                       control={form.control}
                       render={({ field: f }) => (
-                        <Input {...f} value={f.value || ""} className="bg-white" />
+                        <Input {...f} value={f.value || ""} data-field={field.dataField} onKeyDown={handleArrowKey} className="bg-white" />
                       )}
                     />
                   </div>
@@ -250,7 +315,7 @@ export function AddItemModal({ open, onOpenChange, itemNo, onSuccess }: { open: 
               </div>
             </section>
           </div>
-        </ScrollArea>
+        </div>
 
         <div className="flex justify-end space-x-3 p-4 border-t bg-white">
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
