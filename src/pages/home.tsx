@@ -298,7 +298,7 @@ export default function Home() {
   const NUM_CORE_COLS = 3;
 
   const handleArrowKey = (e: React.KeyboardEvent<HTMLDivElement>) => {
-    const ARROWS = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"];
+    const ARROWS = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Enter"];
     if (!ARROWS.includes(e.key)) return;
 
     const target = e.target as HTMLElement;
@@ -313,8 +313,19 @@ export default function Home() {
       e.preventDefault();
       let nr = gridRow, nc = gridCol;
       switch (e.key) {
-        case "ArrowDown":  nr = Math.min(gridRow + 1, NUM_CORE_ROWS - 1); break;
-        case "ArrowUp":    nr = Math.max(gridRow - 1, 0); break;
+        case "ArrowDown":
+        case "Enter":
+          // Special case: if on last row (Wire Colour) and ENTER is pressed, jump to CT Final Dim
+          if (e.key === "Enter" && gridRow === NUM_CORE_ROWS - 1) {
+            const ctFinalDim = document.querySelector<HTMLElement>('[data-field="ct_final_dim"]');
+            ctFinalDim?.focus();
+            return;
+          }
+          nr = Math.min(gridRow + 1, NUM_CORE_ROWS - 1);
+          break;
+        case "ArrowUp":
+          nr = Math.max(gridRow - 1, 0);
+          break;
         case "ArrowRight":
           if (gridCol < NUM_CORE_COLS - 1) { nc = gridCol + 1; }
           else if (gridRow < NUM_CORE_ROWS - 1) { nr = gridRow + 1; nc = 0; }
@@ -340,7 +351,7 @@ export default function Home() {
       );
       const idx = all.indexOf(target);
       if (idx === -1) return;
-      const isNext = e.key === "ArrowDown" || e.key === "ArrowRight";
+      const isNext = e.key === "ArrowDown" || e.key === "ArrowRight" || e.key === "Enter";
       const isPrev = e.key === "ArrowUp"   || e.key === "ArrowLeft";
       if (isNext && idx < all.length - 1) { e.preventDefault(); all[idx + 1].focus(); }
       if (isPrev && idx > 0)              { e.preventDefault(); all[idx - 1].focus(); }
@@ -574,7 +585,7 @@ export default function Home() {
               {/* Bottom Fields */}
               <section className="print-break-inside-avoid">
                 <div className="grid grid-cols-4 gap-4 mt-6">
-                  <FormField form={form} name="ct_final_dim" label="CT Final Dim" disabled={!isFormEnabled} />
+                  <FormField form={form} name="ct_final_dim" label="CT Final Dim" disabled={!isFormEnabled} dataField="ct_final_dim" />
                   <FormField form={form} name="ga_drg" label="GA Drg" disabled={!isFormEnabled} />
                   <FormField form={form} name="ins_class" label="INS Class" disabled={!isFormEnabled} />
                   <FormField form={form} name="ref_ti" label="Ref TI" disabled={!isFormEnabled} />
@@ -695,7 +706,7 @@ function SectionHeader({ title }: { title: string }) {
   );
 }
 
-function FormField({ form, name, label, type = "text", disabled }: { form: any, name: string, label: string, type?: string, disabled?: boolean }) {
+function FormField({ form, name, label, type = "text", disabled, dataField }: { form: any, name: string, label: string, type?: string, disabled?: boolean, dataField?: string }) {
   return (
     <div className="space-y-1">
       <Label className="text-xs font-semibold text-gray-600 uppercase tracking-wider">{label}</Label>
@@ -703,12 +714,13 @@ function FormField({ form, name, label, type = "text", disabled }: { form: any, 
         name={name}
         control={form.control}
         render={({ field }) => (
-          <Input 
-            {...field} 
-            type={type} 
+          <Input
+            {...field}
+            type={type}
             value={field.value || ""}
             disabled={disabled}
-            className="h-9 bg-gray-50 border-gray-300 focus-visible:ring-[#4a6fa5] disabled:bg-[#f0f0f0] disabled:text-gray-700 disabled:opacity-100 disabled:border-transparent print:border-b print:rounded-none" 
+            data-field={dataField}
+            className="h-9 bg-gray-50 border-gray-300 focus-visible:ring-[#4a6fa5] disabled:bg-[#f0f0f0] disabled:text-gray-700 disabled:opacity-100 disabled:border-transparent print:border-b print:rounded-none"
           />
         )}
       />
