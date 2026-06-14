@@ -532,7 +532,26 @@ export default function Home() {
                   </div>
                   <FormField form={form} name="po_item_no" label="PO Item No." disabled={!isFormEnabled} />
                   <FormField form={form} name="serial_number" label="Serial Number" disabled={!isFormEnabled} />
-                  <FormField form={form} name="quantity" label="Quantity" disabled={!isFormEnabled} />
+                  <div className="space-y-1">
+                    <Label className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Quantity</Label>
+                    <div className="flex">
+                      <Controller
+                        name="quantity"
+                        control={form.control}
+                        render={({ field }) => (
+                          <Input
+                            {...field}
+                            value={field.value || ""}
+                            disabled={!isFormEnabled}
+                            className="rounded-r-none border-r-0 bg-gray-50"
+                          />
+                        )}
+                      />
+                      <div className="px-3 py-2 bg-gray-100 border border-l-0 border-gray-300 rounded-r-md text-sm text-gray-600 font-medium flex items-center">
+                        NOS
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </section>
 
