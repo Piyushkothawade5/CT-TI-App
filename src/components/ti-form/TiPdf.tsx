@@ -1,285 +1,388 @@
 import React from "react";
-import { Document, Page, View, Text, StyleSheet } from "@react-pdf/renderer";
+import { Document, Page, View, Text, StyleSheet, Font } from "@react-pdf/renderer";
 import type { TiRecordInput, CoreData } from "@/api-client";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// A4 CONSTANTS  (points: 1pt = 1/72 inch)
+// ─────────────────────────────────────────────────────────────────────────────
+const A4_H = 841.89;   // pt
+const A4_W = 595.28;   // pt
+
+// Fixed structural heights (pt) — measured empirically from the layout below
+const FIXED_HEIGHTS = {
+  pageTopPad:    18,
+  pageBottomPad: 18,
+  header:        46,   // headerRow incl. border
+  infoTable:     5 * 20,  // 5 rows × minHeight 20 ≈ 100
+  electricRow:   24,
+  coreTableHead: 18,
+  noteTable:     42,   // noteTable minHeight 36 + marginTop 6
+  sigRow:        72,   // name 9pt + 18gap + line + label + marginTop 18
+  coreMarginTop: 4,
+};
+
+const TOTAL_FIXED =
+  FIXED_HEIGHTS.pageTopPad +
+  FIXED_HEIGHTS.pageBottomPad +
+  FIXED_HEIGHTS.header +
+  FIXED_HEIGHTS.infoTable +
+  FIXED_HEIGHTS.electricRow +
+  FIXED_HEIGHTS.coreTableHead +
+  FIXED_HEIGHTS.noteTable +
+  FIXED_HEIGHTS.sigRow +
+  FIXED_HEIGHTS.coreMarginTop;
+
+// Separator rows: 2 separators (sep at index 7) each 6 pt high
+// But we count them below in buildRows so we keep it generic.
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SCALING ENGINE
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface ScaleConfig {
+  fontSize: number;       // body font size (pt)
+  labelSize: number;      // label/bold size
+  headerTitleSize: number;
+  headerSubSize: number;
+  rowHeight: number;      // minHeight of each core row
+  sepHeight: number;      // separator row height
+  padH: number;           // cell paddingHorizontal
+  padV: number;           // cell paddingVertical
+  pagePadH: number;       // page side padding
+  pagePadV: number;       // page top/bottom padding
+}
+
+/** Estimate total page height for a given scale and row count */
+function estimateHeight(scale: ScaleConfig, dataRows: number, sepRows: number): number {
+  const coreBodyHeight = dataRows * scale.rowHeight + sepRows * scale.sepHeight;
+
+  const headerH   = scale.headerTitleSize + 4 + scale.headerSubSize + 2 * scale.padV + 2;
+  const infoRowH  = scale.fontSize + scale.labelSize + scale.padV * 2 + 3;
+  const infoH     = 5 * infoRowH;
+  const elecH     = scale.fontSize + scale.labelSize + scale.padV * 2 + 3 + 2;
+  const noteH     = 36 + 6; // note minHeight + marginTop
+  const sigH      = scale.fontSize * 1.2 + 18 + 4 + scale.fontSize + 18; // name + gap + line + label + marginTop
+
+  return (
+    scale.pagePadV * 2 +
+    headerH +
+    infoH +
+    elecH +
+    scale.coreMarginTop +
+    18 +       // core table header row
+    coreBodyHeight +
+    noteH +
+    sigH
+  );
+}
+(estimateHeight as any).coreMarginTop = 4;  // just to avoid unused warning
+
+/** Binary-search a scale that makes content fit in A4_H */
+function computeScale(dataRows: number, sepRows: number): ScaleConfig {
+  // Candidate scales from largest to smallest
+  const candidates: ScaleConfig[] = [
+    // Scale A – comfortable default
+    { fontSize: 8,   labelSize: 7.5, headerTitleSize: 11, headerSubSize: 9, rowHeight: 14, sepHeight: 6,  padH: 4, padV: 3, pagePadH: 22, pagePadV: 18 },
+    // Scale B – slightly tighter
+    { fontSize: 7.5, labelSize: 7,   headerTitleSize: 10, headerSubSize: 8, rowHeight: 13, sepHeight: 5,  padH: 4, padV: 2, pagePadH: 22, pagePadV: 14 },
+    // Scale C – compact
+    { fontSize: 7,   labelSize: 6.5, headerTitleSize: 9,  headerSubSize: 7.5, rowHeight: 12, sepHeight: 4, padH: 3, padV: 2, pagePadH: 20, pagePadV: 12 },
+    // Scale D – very compact
+    { fontSize: 6.5, labelSize: 6,   headerTitleSize: 8.5, headerSubSize: 7, rowHeight: 11, sepHeight: 4,  padH: 3, padV: 1, pagePadH: 18, pagePadV: 10 },
+    // Scale E – ultra-compact (last resort)
+    { fontSize: 6,   labelSize: 5.5, headerTitleSize: 8,  headerSubSize: 6.5, rowHeight: 10, sepHeight: 3, padH: 2, padV: 1, pagePadH: 16, pagePadV: 8  },
+  ];
+
+  for (const scale of candidates) {
+    const est = estimatePageHeight(scale, dataRows, sepRows);
+    if (est <= A4_H) return scale;
+  }
+  // Fallback – return smallest scale regardless
+  return candidates[candidates.length - 1];
+}
+
+/** More careful estimation used in the engine */
+function estimatePageHeight(scale: ScaleConfig, dataRows: number, sepRows: number): number {
+  const lineH = scale.fontSize * 1.2;
+  const infoRowH  = scale.labelSize * 1.2 + lineH + scale.padV * 2 + 1;
+  const headerH   = scale.headerTitleSize * 1.2 + scale.headerSubSize * 1.2 + scale.padV * 2 + 4;
+  const elecH     = scale.labelSize * 1.2 + lineH + scale.padV * 2 + 2;
+  const coreHeadH = scale.fontSize * 1.2 + scale.padV * 2 + 2;
+  const coreBodyH = dataRows * scale.rowHeight + sepRows * scale.sepHeight;
+  const noteH     = Math.max(36, scale.labelSize * 1.2 + lineH * 3 + scale.padV * 2) + 6;
+  const sigH      = scale.fontSize * 1.1 + 18 + 4 + scale.fontSize + 18 + 4;
+
+  return (
+    scale.pagePadV * 2 +
+    headerH +
+    5 * infoRowH +
+    elecH +
+    4 +             // coreMarginTop
+    coreHeadH +
+    coreBodyH +
+    noteH +
+    sigH
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HELPERS
+// ─────────────────────────────────────────────────────────────────────────────
 
 const BLACK = "#000000";
 
-const s = StyleSheet.create({
-  page: {
-    fontFamily: "Helvetica",
-    fontSize: 8,
-    paddingTop: 18,
-    paddingBottom: 18,
-    paddingLeft: 22,
-    paddingRight: 22,
-    color: BLACK,
-  },
-
-  // ── Header ────────────────────────────────────────────────
-  headerRow: {
-    flexDirection: "row",
-    borderWidth: 1,
-    borderColor: BLACK,
-    borderStyle: "solid",
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    marginBottom: 0,
-    alignItems: "center",
-  },
-  headerLeft: { flex: 1, alignItems: "center" },
-  headerTitle: { fontSize: 11, fontFamily: "Helvetica-Bold", letterSpacing: 0.5 },
-  headerSub: { fontSize: 9, marginTop: 2 },
-  headerRight: { flex: 1, alignItems: "flex-end" },
-  headerField: { flexDirection: "row", marginBottom: 3 },
-  headerLabel: { fontFamily: "Helvetica-Bold", marginRight: 4 },
-
-  // ── Info table ────────────────────────────────────────────
-  infoTable: {
-    borderLeftWidth: 1,
-    borderRightWidth: 1,
-    borderBottomWidth: 1,
-    borderTopWidth: 0,
-    borderColor: BLACK,
-    borderStyle: "solid",
-  },
-  infoRow: {
-    flexDirection: "row",
-    borderBottomWidth: 1,
-    borderColor: BLACK,
-    borderStyle: "solid",
-    minHeight: 20,
-  },
-  infoRowLast: {
-    flexDirection: "row",
-    minHeight: 20,
-  },
-  infoCell: {
-    flex: 1,
-    paddingHorizontal: 5,
-    paddingVertical: 3,
-    borderRightWidth: 1,
-    borderColor: BLACK,
-    borderStyle: "solid",
-  },
-  infoCellLast: {
-    flex: 1,
-    paddingHorizontal: 5,
-    paddingVertical: 3,
-  },
-  infoLabel: { fontFamily: "Helvetica-Bold", fontSize: 7.5 },
-  infoValue: { fontSize: 8, marginTop: 1 },
-
-  // ── Electric row ──────────────────────────────────────────
-  electricRow: {
-    flexDirection: "row",
-    borderLeftWidth: 1,
-    borderRightWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: BLACK,
-    borderStyle: "solid",
-    minHeight: 24,
-  },
-  eCell: {
-    flex: 1,
-    paddingHorizontal: 4,
-    paddingVertical: 3,
-    borderRightWidth: 1,
-    borderColor: BLACK,
-    borderStyle: "solid",
-  },
-  eCellLast: {
-    flex: 1,
-    paddingHorizontal: 4,
-    paddingVertical: 3,
-  },
-  eCellLabel: { fontFamily: "Helvetica-Bold", fontSize: 7.5 },
-  eCellValue: { fontSize: 8, marginTop: 1 },
-
-  // ── Core Particulars table ────────────────────────────────
-  coreTable: {
-    borderLeftWidth: 1,
-    borderRightWidth: 1,
-    borderTopWidth: 1,
-    borderBottomWidth: 0,
-    borderColor: BLACK,
-    borderStyle: "solid",
-    marginTop: 4,
-  },
-  coreHeaderRow: {
-    flexDirection: "row",
-    backgroundColor: "#cccccc",
-    borderBottomWidth: 1,
-    borderColor: BLACK,
-    borderStyle: "solid",
-  },
-  coreRow: {
-    flexDirection: "row",
-    borderBottomWidth: 1,
-    borderColor: BLACK,
-    borderStyle: "solid",
-    minHeight: 14,
-  },
-  colLabel: {
-    width: "34%",
-    paddingHorizontal: 4,
-    paddingVertical: 2,
-    borderRightWidth: 1,
-    borderColor: BLACK,
-    borderStyle: "solid",
-  },
-  colCore: {
-    flex: 1,
-    paddingHorizontal: 4,
-    paddingVertical: 2,
-    borderRightWidth: 1,
-    borderColor: BLACK,
-    borderStyle: "solid",
-  },
-  colCoreLast: {
-    flex: 1,
-    paddingHorizontal: 4,
-    paddingVertical: 2,
-  },
-  colSpanned: {
-    flex: 3,
-    paddingHorizontal: 4,
-    paddingVertical: 2,
-  },
-
-  // ── Notes & Revision ──────────────────────────────────────
-  noteTable: {
-    borderLeftWidth: 1,
-    borderRightWidth: 1,
-    borderBottomWidth: 1,
-    borderTopWidth: 1,
-    borderColor: BLACK,
-    borderStyle: "solid",
-    marginTop: 6,
-    flexDirection: "row",
-    minHeight: 36,
-  },
-  noteCell: {
-    flex: 4,
-    paddingHorizontal: 5,
-    paddingVertical: 3,
-    borderRightWidth: 1,
-    borderColor: BLACK,
-    borderStyle: "solid",
-  },
-  revCell: {
-    flex: 1,
-    paddingHorizontal: 5,
-    paddingVertical: 3,
-  },
-  noteLabel: { fontFamily: "Helvetica-Bold", fontSize: 7.5, marginBottom: 2 },
-  noteValue: { fontSize: 8, lineHeight: 1.3 },
-
-  // ── Signatures ────────────────────────────────────────────
-  sigRow: {
-    flexDirection: "row",
-    marginTop: 18,
-    paddingTop: 4,
-  },
-  sigCell: {
-    flex: 1,
-    alignItems: "center",
-    paddingHorizontal: 4,
-  },
-  sigName: { fontSize: 9, marginBottom: 18, fontFamily: "Helvetica-Bold" },
-  sigLine: {
-    borderTopWidth: 1,
-    borderColor: BLACK,
-    borderStyle: "solid",
-    width: "85%",
-    marginTop: 2,
-    paddingTop: 3,
-  },
-  sigLabel: { fontSize: 8, fontFamily: "Helvetica-Bold", textAlign: "center" },
-
-  bold: { fontFamily: "Helvetica-Bold" },
-  center: { textAlign: "center" },
-});
-
-function v(val?: string | null): string {
-  return val ?? "";
-}
+function v(val?: string | null): string { return val ?? ""; }
 
 function formatDate(dateStr?: string | null): string {
   if (!dateStr) return "";
   try {
     const d = new Date(dateStr + "T00:00:00");
     const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-    return `${String(d.getDate()).padStart(2, "0")}-${months[d.getMonth()]}-${d.getFullYear()}`;
-  } catch {
-    return dateStr;
-  }
+    return `${String(d.getDate()).padStart(2,"0")}-${months[d.getMonth()]}-${d.getFullYear()}`;
+  } catch { return dateStr; }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// ROW DEFINITIONS
+// ─────────────────────────────────────────────────────────────────────────────
+
 type CoreRow =
-  | { type: "core"; label: string; key: keyof CoreData }
+  | { type: "core";   label: string; key: keyof CoreData }
   | { type: "single"; label: string; value: string }
   | { type: "separator" };
+
+function buildRows(data: TiRecordInput, maxExcLabel: string): CoreRow[] {
+  return [
+    { type: "core",   label: "RATIO",                    key: "ratio" },
+    { type: "core",   label: "Burden (VA)",               key: "burden_va" },
+    { type: "core",   label: "Accuracy Class",            key: "accuracy_class" },
+    { type: "core",   label: "ISF",                       key: "isf" },
+    { type: "core",   label: "Min. Knee pt. volt.",       key: "min_knee_pt_volt" },
+    { type: "core",   label: "Max. Rct @ 75\u00b0c",     key: "max_rct_75c" },
+    { type: "core",   label: maxExcLabel,                 key: "max_exc_vk2" },
+    { type: "separator" },
+    { type: "core",   label: "Core Dimensions",           key: "bare_core_dim" },
+    { type: "core",   label: "Core Material",             key: "core_material" },
+    { type: "core",   label: "Core weight (Kg)",          key: "core_weight_kg" },
+    { type: "core",   label: "Sec. Total Turns",          key: "sec_total_turns" },
+    { type: "core",   label: "Sec. Ter. Marking",         key: "sec_ter_marking" },
+    { type: "core",   label: "Sec. Conductor (S1-S2)",    key: "sec_cond_s1s2" },
+    { type: "core",   label: "Sec. Turns (S1-S2)",        key: "sec_turns_s1s2" },
+    { type: "core",   label: "Sec. Conductor (S2-S3)",    key: "sec_cond_s2s3" },
+    { type: "core",   label: "Sec. Turns (S2-S3)",        key: "sec_turns_s2s3" },
+    { type: "core",   label: "Sec. Conductor (S3-S4)",    key: "sec_cond_s3s4" },
+    { type: "core",   label: "Sec. Turns (S3-S4)",        key: "sec_turns_s3s4" },
+    { type: "core",   label: "Sec. Conductor (S4-S5)",    key: "sec_cond_s4s5" },
+    { type: "core",   label: "Sec. Turns (S4-S5)",        key: "sec_turns_s4s5" },
+    { type: "core",   label: "Sec. Copper weight (kg)",   key: "sec_copper_wt" },
+    { type: "core",   label: "Finished Core Dim. (mm)",   key: "finished_core_dim" },
+    { type: "core",   label: "Sec Connection",            key: "sec_connection" },
+    { type: "core",   label: "Wire Length",               key: "wire_length" },
+    { type: "core",   label: "Wire Colour",               key: "wire_colour" },
+    { type: "single", label: "CT final dim",   value: v(data.ct_final_dim) },
+    { type: "single", label: "GA Drg",         value: v(data.ga_drg) },
+    { type: "single", label: "INS CLASS",       value: v(data.ins_class) },
+    { type: "single", label: "PRI Turns",       value: v(data.pri_turns) },
+    { type: "single", label: "PRI Copper",      value: v(data.pri_copper) },
+    { type: "single", label: "Former",          value: v(data.former) },
+    { type: "single", label: "PRI Length",      value: v(data.pri_length) },
+    { type: "single", label: "PRI Weight",      value: v(data.pri_weight) },
+    { type: "single", label: "Sec. Terminal",   value: v(data.sec_terminal) },
+    { type: "single", label: "Total Weight",    value: v(data.total_weight) },
+    { type: "single", label: "Ref TI:",         value: v(data.ref_ti) },
+  ];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DYNAMIC STYLESHEET FACTORY
+// ─────────────────────────────────────────────────────────────────────────────
+
+function makeStyles(sc: ScaleConfig) {
+  const B = { fontFamily: "Helvetica-Bold" } as const;
+
+  return StyleSheet.create({
+    page: {
+      fontFamily: "Helvetica",
+      fontSize: sc.fontSize,
+      paddingTop: sc.pagePadV,
+      paddingBottom: sc.pagePadV,
+      paddingLeft: sc.pagePadH,
+      paddingRight: sc.pagePadH,
+      color: BLACK,
+    },
+
+    // ── Header ──
+    headerRow: {
+      flexDirection: "row",
+      borderWidth: 1, borderColor: BLACK, borderStyle: "solid",
+      paddingHorizontal: sc.padH + 4,
+      paddingVertical: sc.padV + 2,
+      marginBottom: 0,
+      alignItems: "center",
+    },
+    headerLeft:  { flex: 1, alignItems: "center" },
+    headerTitle: { fontSize: sc.headerTitleSize, ...B, letterSpacing: 0.5 },
+    headerSub:   { fontSize: sc.headerSubSize, marginTop: 2 },
+    headerRight: { flex: 1, alignItems: "flex-end" },
+    headerField: { flexDirection: "row", marginBottom: 3 },
+    headerLabel: { ...B, marginRight: 4 },
+
+    // ── Info table ──
+    infoTable: {
+      borderLeftWidth: 1, borderRightWidth: 1,
+      borderBottomWidth: 1, borderTopWidth: 0,
+      borderColor: BLACK, borderStyle: "solid",
+    },
+    infoRow:     { flexDirection: "row", borderBottomWidth: 1, borderColor: BLACK, borderStyle: "solid" },
+    infoRowLast: { flexDirection: "row" },
+    infoCell: {
+      flex: 1,
+      paddingHorizontal: sc.padH + 1,
+      paddingVertical: sc.padV,
+      borderRightWidth: 1, borderColor: BLACK, borderStyle: "solid",
+    },
+    infoCellLast: {
+      flex: 1,
+      paddingHorizontal: sc.padH + 1,
+      paddingVertical: sc.padV,
+    },
+    infoLabel: { ...B, fontSize: sc.labelSize },
+    infoValue:  { fontSize: sc.fontSize, marginTop: 1 },
+
+    // ── Electric row ──
+    electricRow: {
+      flexDirection: "row",
+      borderLeftWidth: 1, borderRightWidth: 1, borderBottomWidth: 1,
+      borderColor: BLACK, borderStyle: "solid",
+    },
+    eCell: {
+      flex: 1,
+      paddingHorizontal: sc.padH,
+      paddingVertical: sc.padV,
+      borderRightWidth: 1, borderColor: BLACK, borderStyle: "solid",
+    },
+    eCellLast: { flex: 1, paddingHorizontal: sc.padH, paddingVertical: sc.padV },
+    eCellLabel: { ...B, fontSize: sc.labelSize },
+    eCellValue:  { fontSize: sc.fontSize, marginTop: 1 },
+
+    // ── Core Particulars table ──
+    coreTable: {
+      borderLeftWidth: 1, borderRightWidth: 1,
+      borderTopWidth: 1, borderBottomWidth: 0,
+      borderColor: BLACK, borderStyle: "solid",
+      marginTop: 4,
+    },
+    coreHeaderRow: {
+      flexDirection: "row",
+      backgroundColor: "#cccccc",
+      borderBottomWidth: 1, borderColor: BLACK, borderStyle: "solid",
+    },
+    coreRow: {
+      flexDirection: "row",
+      borderBottomWidth: 1, borderColor: BLACK, borderStyle: "solid",
+      minHeight: sc.rowHeight,
+    },
+    coreSepRow: {
+      flexDirection: "row",
+      borderBottomWidth: 1, borderColor: BLACK, borderStyle: "solid",
+      minHeight: sc.sepHeight,
+    },
+    colLabel: {
+      width: "34%",
+      paddingHorizontal: sc.padH,
+      paddingVertical: sc.padV,
+      borderRightWidth: 1, borderColor: BLACK, borderStyle: "solid",
+      fontSize: sc.labelSize,
+    },
+    colCore: {
+      flex: 1,
+      paddingHorizontal: sc.padH,
+      paddingVertical: sc.padV,
+      borderRightWidth: 1, borderColor: BLACK, borderStyle: "solid",
+      fontSize: sc.fontSize,
+    },
+    colCoreLast: {
+      flex: 1,
+      paddingHorizontal: sc.padH,
+      paddingVertical: sc.padV,
+      fontSize: sc.fontSize,
+    },
+    colSpanned: {
+      flex: 3,
+      paddingHorizontal: sc.padH,
+      paddingVertical: sc.padV,
+      fontSize: sc.fontSize,
+    },
+    coreHeaderCell: {
+      paddingHorizontal: sc.padH,
+      paddingVertical: sc.padV,
+      fontSize: sc.labelSize,
+      backgroundColor: "#cccccc",
+    },
+
+    // ── Notes & Revision ──
+    noteTable: {
+      borderLeftWidth: 1, borderRightWidth: 1,
+      borderBottomWidth: 1, borderTopWidth: 1,
+      borderColor: BLACK, borderStyle: "solid",
+      marginTop: 6, flexDirection: "row",
+      minHeight: 36,
+    },
+    noteCell: {
+      flex: 4,
+      paddingHorizontal: sc.padH + 1,
+      paddingVertical: sc.padV,
+      borderRightWidth: 1, borderColor: BLACK, borderStyle: "solid",
+    },
+    revCell: { flex: 1, paddingHorizontal: sc.padH + 1, paddingVertical: sc.padV },
+    noteLabel: { ...B, fontSize: sc.labelSize, marginBottom: 2 },
+    noteValue:  { fontSize: sc.fontSize, lineHeight: 1.3 },
+
+    // ── Signatures ──
+    sigRow:  { flexDirection: "row", marginTop: 18, paddingTop: 4 },
+    sigCell: { flex: 1, alignItems: "center", paddingHorizontal: sc.padH },
+    sigName: { fontSize: sc.fontSize + 1, marginBottom: 18, ...B },
+    sigLine: {
+      borderTopWidth: 1, borderColor: BLACK, borderStyle: "solid",
+      width: "85%", marginTop: 2, paddingTop: 3,
+    },
+    sigLabel: { fontSize: sc.fontSize, ...B, textAlign: "center" },
+
+    bold:   B,
+    center: { textAlign: "center" },
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// COMPONENT
+// ─────────────────────────────────────────────────────────────────────────────
 
 type Props = {
   data: TiRecordInput & { ti_no?: string | null };
 };
 
 export function TiPdfDocument({ data }: Props) {
-  const c1 = data.core1 ?? {};
-  const c2 = data.core2 ?? {};
-  const c3 = data.core3 ?? {};
+  const c1 = (data.core1 ?? {}) as CoreData;
+  const c2 = (data.core2 ?? {}) as CoreData;
+  const c3 = (data.core3 ?? {}) as CoreData;
 
-  const maxExcVoltage =
-    (c1 as CoreData).max_exc_voltage ||
-    (c2 as CoreData).max_exc_voltage ||
-    (c3 as CoreData).max_exc_voltage;
-  const maxExcLabel = `Max. Exc. C/n. :- @${maxExcVoltage || "VK/2"}`;
+  const maxExcVoltage = c1.max_exc_voltage || c2.max_exc_voltage || c3.max_exc_voltage;
+  const maxExcLabel   = `Max. Exc. C/n. :- @${maxExcVoltage || "VK/2"}`;
 
-  const rows: CoreRow[] = [
-    { type: "core", label: "RATIO", key: "ratio" },
-    { type: "core", label: "Burden (VA)", key: "burden_va" },
-    { type: "core", label: "Accuracy Class", key: "accuracy_class" },
-    { type: "core", label: "ISF", key: "isf" },
-    { type: "core", label: "Min. Knee pt. volt.", key: "min_knee_pt_volt" },
-    { type: "core", label: "Max. Rct @ 75\u00b0c", key: "max_rct_75c" },
-    { type: "core", label: maxExcLabel, key: "max_exc_vk2" },
-    { type: "separator" },
-    { type: "core", label: "Core Dimensions", key: "bare_core_dim" },
-    { type: "core", label: "Core Material", key: "core_material" },
-    { type: "core", label: "Core weight (Kg)", key: "core_weight_kg" },
-    { type: "core", label: "Sec. Total Turns", key: "sec_total_turns" },
-    { type: "core", label: "Sec. Ter. Marking", key: "sec_ter_marking" },
-    { type: "core", label: "Sec. Conductor (S1-S2)", key: "sec_cond_s1s2" },
-    { type: "core", label: "Sec. Turns (S1-S2)", key: "sec_turns_s1s2" },
-    { type: "core", label: "Sec. Conductor (S2-S3)", key: "sec_cond_s2s3" },
-    { type: "core", label: "Sec. Turns (S2-S3)", key: "sec_turns_s2s3" },
-    { type: "core", label: "Sec. Conductor (S3-S4)", key: "sec_cond_s3s4" },
-    { type: "core", label: "Sec. Turns (S3-S4)", key: "sec_turns_s3s4" },
-    { type: "core", label: "Sec. Conductor (S4-S5)", key: "sec_cond_s4s5" },
-    { type: "core", label: "Sec. Turns (S4-S5)", key: "sec_turns_s4s5" },
-    { type: "core", label: "Sec. Copper weight (kg)", key: "sec_copper_wt" },
-    { type: "core", label: "Finished Core Dim. (mm)", key: "finished_core_dim" },
-    { type: "core", label: "Sec Connection", key: "sec_connection" },
-    { type: "core", label: "Wire Length", key: "wire_length" },
-    { type: "core", label: "Wire Colour", key: "wire_colour" },
-    { type: "single", label: "CT final dim", value: v(data.ct_final_dim) },
-    { type: "single", label: "GA Drg", value: v(data.ga_drg) },
-    { type: "single", label: "INS CLASS", value: v(data.ins_class) },
-    { type: "single", label: "PRI Turns", value: v(data.pri_turns) },
-    { type: "single", label: "PRI Copper", value: v(data.pri_copper) },
-    { type: "single", label: "Former", value: v(data.former) },
-    { type: "single", label: "PRI Length", value: v(data.pri_length) },
-    { type: "single", label: "PRI Weight", value: v(data.pri_weight) },
-    { type: "single", label: "Sec. Terminal", value: v(data.sec_terminal) },
-    { type: "single", label: "Total Weight", value: v(data.total_weight) },
-    { type: "single", label: "Ref TI:", value: v(data.ref_ti) },
-  ];
+  const rows     = buildRows(data, maxExcLabel);
+  const sepRows  = rows.filter(r => r.type === "separator").length;
+  const dataRows = rows.length - sepRows;
 
+  // ── Auto-scale resolution ──────────────────────────────────────────────────
+  const sc = computeScale(dataRows, sepRows);
+  const s  = makeStyles(sc);
+
+  // ─────────────────────────────────────────────────────────────────────────
   return (
     <Document>
       <Page size="A4" style={s.page}>
 
-        {/* ── Header ── */}
+        {/* ── Header ──────────────────────────────────────────────────── */}
         <View style={s.headerRow}>
           <View style={s.headerLeft}>
             <Text style={s.headerTitle}>TECHNICAL INSTRUCTION</Text>
@@ -297,7 +400,7 @@ export function TiPdfDocument({ data }: Props) {
           </View>
         </View>
 
-        {/* ── Info / Customer section ── */}
+        {/* ── Info / Customer ─────────────────────────────────────────── */}
         <View style={s.infoTable}>
           <View style={s.infoRow}>
             <View style={s.infoCell}>
@@ -351,14 +454,14 @@ export function TiPdfDocument({ data }: Props) {
           </View>
         </View>
 
-        {/* ── Electric details row ── */}
+        {/* ── Electrical details ──────────────────────────────────────── */}
         <View style={s.electricRow}>
           {[
-            { label: "RATIO :-", value: v(data.ratio) },
+            { label: "RATIO :-",      value: v(data.ratio) },
             { label: "RATED VOLTAGE", value: v(data.rated_voltage) },
-            { label: "STC", value: v(data.stc) },
-            { label: "I.L.", value: v(data.insulation_level) },
-            { label: "FREQ.", value: v(data.frequency) },
+            { label: "STC",           value: v(data.stc) },
+            { label: "I.L.",          value: v(data.insulation_level) },
+            { label: "FREQ.",         value: v(data.frequency) },
           ].map((f) => (
             <View key={f.label} style={s.eCell}>
               <Text style={s.eCellLabel}>{f.label}</Text>
@@ -371,27 +474,30 @@ export function TiPdfDocument({ data }: Props) {
           </View>
         </View>
 
-        {/* ── Core Particulars table ── */}
+        {/* ── Core Particulars table ──────────────────────────────────── */}
         <View style={s.coreTable}>
+
+          {/* Header row */}
           <View style={s.coreHeaderRow}>
-            <View style={[s.colLabel, { backgroundColor: "#cccccc" }]}>
+            <View style={[s.colLabel, s.coreHeaderCell]}>
               <Text style={[s.bold, s.center]}>PARTICULARS</Text>
             </View>
-            <View style={[s.colCore, { backgroundColor: "#cccccc" }]}>
+            <View style={[s.colCore, s.coreHeaderCell]}>
               <Text style={[s.bold, s.center]}>Core 1</Text>
             </View>
-            <View style={[s.colCore, { backgroundColor: "#cccccc" }]}>
+            <View style={[s.colCore, s.coreHeaderCell]}>
               <Text style={[s.bold, s.center]}>Core 2</Text>
             </View>
-            <View style={[s.colCoreLast, { backgroundColor: "#cccccc" }]}>
+            <View style={[s.colCoreLast, s.coreHeaderCell]}>
               <Text style={[s.bold, s.center]}>Core 3</Text>
             </View>
           </View>
 
+          {/* Data rows */}
           {rows.map((row, idx) => {
             if (row.type === "separator") {
               return (
-                <View key={`sep-${idx}`} style={[s.coreRow, { minHeight: 6 }]}>
+                <View key={`sep-${idx}`} style={s.coreSepRow}>
                   <View style={s.colLabel}><Text> </Text></View>
                   <View style={s.colCore}><Text> </Text></View>
                   <View style={s.colCore}><Text> </Text></View>
@@ -399,22 +505,19 @@ export function TiPdfDocument({ data }: Props) {
                 </View>
               );
             }
+
             if (row.type === "core") {
               return (
                 <View key={idx} style={s.coreRow}>
                   <View style={s.colLabel}><Text>{row.label}</Text></View>
-                  <View style={s.colCore}>
-                    <Text>{v((c1 as CoreData)[row.key])}</Text>
-                  </View>
-                  <View style={s.colCore}>
-                    <Text>{v((c2 as CoreData)[row.key])}</Text>
-                  </View>
-                  <View style={s.colCoreLast}>
-                    <Text>{v((c3 as CoreData)[row.key])}</Text>
-                  </View>
+                  <View style={s.colCore}><Text>{v(c1[row.key])}</Text></View>
+                  <View style={s.colCore}><Text>{v(c2[row.key])}</Text></View>
+                  <View style={s.colCoreLast}><Text>{v(c3[row.key])}</Text></View>
                 </View>
               );
             }
+
+            // single (spans all core columns)
             return (
               <View key={idx} style={s.coreRow}>
                 <View style={s.colLabel}><Text>{row.label}</Text></View>
@@ -424,7 +527,7 @@ export function TiPdfDocument({ data }: Props) {
           })}
         </View>
 
-        {/* ── Notes & Revision ── */}
+        {/* ── Notes & Revision ────────────────────────────────────────── */}
         <View style={s.noteTable}>
           <View style={s.noteCell}>
             <Text style={s.noteLabel}>NOTE</Text>
@@ -436,26 +539,20 @@ export function TiPdfDocument({ data }: Props) {
           </View>
         </View>
 
-        {/* ── Signatures ── */}
+        {/* ── Signatures ──────────────────────────────────────────────── */}
         <View style={s.sigRow}>
-          <View style={s.sigCell}>
-            <Text style={s.sigName}>{v(data.created_by)}</Text>
-            <View style={s.sigLine}>
-              <Text style={s.sigLabel}>Created By</Text>
+          {[
+            { name: data.created_by,  label: "Created By" },
+            { name: data.checked_by,  label: "Checked By" },
+            { name: data.approved_by, label: "Approved By" },
+          ].map(({ name, label }) => (
+            <View key={label} style={s.sigCell}>
+              <Text style={s.sigName}>{v(name)}</Text>
+              <View style={s.sigLine}>
+                <Text style={s.sigLabel}>{label}</Text>
+              </View>
             </View>
-          </View>
-          <View style={s.sigCell}>
-            <Text style={s.sigName}>{v(data.checked_by)}</Text>
-            <View style={s.sigLine}>
-              <Text style={s.sigLabel}>Checked By</Text>
-            </View>
-          </View>
-          <View style={s.sigCell}>
-            <Text style={s.sigName}>{v(data.approved_by)}</Text>
-            <View style={s.sigLine}>
-              <Text style={s.sigLabel}>Approved By</Text>
-            </View>
-          </View>
+          ))}
         </View>
 
       </Page>
