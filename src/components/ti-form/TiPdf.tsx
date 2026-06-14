@@ -81,16 +81,18 @@ function estimateHeight(scale: ScaleConfig, dataRows: number, sepRows: number): 
 function computeScale(dataRows: number, sepRows: number): ScaleConfig {
   // Candidate scales from largest to smallest
   const candidates: ScaleConfig[] = [
-    // Scale A – comfortable default
-    { fontSize: 8,   labelSize: 7.5, headerTitleSize: 11, headerSubSize: 9, rowHeight: 14, sepHeight: 6,  padH: 4, padV: 3, pagePadH: 22, pagePadV: 18 },
-    // Scale B – slightly tighter
-    { fontSize: 7.5, labelSize: 7,   headerTitleSize: 10, headerSubSize: 8, rowHeight: 13, sepHeight: 5,  padH: 4, padV: 2, pagePadH: 22, pagePadV: 14 },
-    // Scale C – compact
-    { fontSize: 7,   labelSize: 6.5, headerTitleSize: 9,  headerSubSize: 7.5, rowHeight: 12, sepHeight: 4, padH: 3, padV: 2, pagePadH: 20, pagePadV: 12 },
-    // Scale D – very compact
-    { fontSize: 6.5, labelSize: 6,   headerTitleSize: 8.5, headerSubSize: 7, rowHeight: 11, sepHeight: 4,  padH: 3, padV: 1, pagePadH: 18, pagePadV: 10 },
-    // Scale E – ultra-compact (last resort)
-    { fontSize: 6,   labelSize: 5.5, headerTitleSize: 8,  headerSubSize: 6.5, rowHeight: 10, sepHeight: 3, padH: 2, padV: 1, pagePadH: 16, pagePadV: 8  },
+    // Scale A – roomy (inline info rows free up ~50pt vs stacked)
+    { fontSize: 9,   labelSize: 8.5, headerTitleSize: 12, headerSubSize: 10, rowHeight: 14, sepHeight: 6,  padH: 5, padV: 4, pagePadH: 22, pagePadV: 18 },
+    // Scale B – comfortable default
+    { fontSize: 8.5, labelSize: 8,   headerTitleSize: 11, headerSubSize: 9,  rowHeight: 14, sepHeight: 6,  padH: 4, padV: 3, pagePadH: 22, pagePadV: 16 },
+    // Scale C – slightly tighter
+    { fontSize: 8,   labelSize: 7.5, headerTitleSize: 10, headerSubSize: 8.5,rowHeight: 13, sepHeight: 5,  padH: 4, padV: 2, pagePadH: 22, pagePadV: 14 },
+    // Scale D – compact
+    { fontSize: 7.5, labelSize: 7,   headerTitleSize: 9.5,headerSubSize: 8,  rowHeight: 12, sepHeight: 4,  padH: 3, padV: 2, pagePadH: 20, pagePadV: 12 },
+    // Scale E – very compact
+    { fontSize: 7,   labelSize: 6.5, headerTitleSize: 9,  headerSubSize: 7.5,rowHeight: 11, sepHeight: 4,  padH: 3, padV: 1, pagePadH: 18, pagePadV: 10 },
+    // Scale F – ultra-compact (last resort)
+    { fontSize: 6.5, labelSize: 6,   headerTitleSize: 8.5,headerSubSize: 7,  rowHeight: 10, sepHeight: 3,  padH: 2, padV: 1, pagePadH: 16, pagePadV: 8  },
   ];
 
   for (const scale of candidates) {
@@ -104,7 +106,8 @@ function computeScale(dataRows: number, sepRows: number): ScaleConfig {
 /** More careful estimation used in the engine */
 function estimatePageHeight(scale: ScaleConfig, dataRows: number, sepRows: number): number {
   const lineH = scale.fontSize * 1.2;
-  const infoRowH  = scale.labelSize * 1.2 + lineH + scale.padV * 2 + 1;
+  // Info rows are now single-line "LABEL : value" → only one line height needed
+  const infoRowH  = Math.max(lineH, scale.labelSize * 1.2) + scale.padV * 2 + 1;
   const headerH   = scale.headerTitleSize * 1.2 + scale.headerSubSize * 1.2 + scale.padV * 2 + 4;
   const elecH     = scale.labelSize * 1.2 + lineH + scale.padV * 2 + 2;
   const coreHeadH = scale.fontSize * 1.2 + scale.padV * 2 + 2;
@@ -246,8 +249,14 @@ function makeStyles(sc: ScaleConfig) {
       paddingHorizontal: sc.padH + 1,
       paddingVertical: sc.padV,
     },
-    infoLabel: { ...B, fontSize: sc.labelSize },
-    infoValue:  { fontSize: sc.fontSize, marginTop: 1 },
+    // Inline "LABEL : value" — single row, no stacking
+    infoInlineRow: {
+      flexDirection: "row",
+      alignItems: "center",
+    },
+    infoLabel:     { ...B, fontSize: sc.labelSize },
+    infoColon:     { ...B, fontSize: sc.labelSize, marginHorizontal: 2 },
+    infoValue:     { fontSize: sc.fontSize, flex: 1 },
 
     // ── Electric row ──
     electricRow: {
@@ -263,7 +272,7 @@ function makeStyles(sc: ScaleConfig) {
     },
     eCellLast: { flex: 1, paddingHorizontal: sc.padH, paddingVertical: sc.padV },
     eCellLabel: { ...B, fontSize: sc.labelSize },
-    eCellValue:  { fontSize: sc.fontSize, marginTop: 1 },
+    eCellValue:  { fontSize: sc.fontSize, flex: 1 },
 
     // ── Core Particulars table ──
     coreTable: {
@@ -401,77 +410,65 @@ export function TiPdfDocument({ data }: Props) {
         </View>
 
         {/* ── Info / Customer ─────────────────────────────────────────── */}
+        {/* Each cell is now a single inline row: LABEL : value            */}
         <View style={s.infoTable}>
-          <View style={s.infoRow}>
-            <View style={s.infoCell}>
-              <Text style={s.infoLabel}>CUSTOMER NAME</Text>
-              <Text style={s.infoValue}>{v(data.customer_name)}</Text>
-            </View>
-            <View style={s.infoCellLast}>
-              <Text style={s.infoLabel}>CUS. ORDER. NO.</Text>
-              <Text style={s.infoValue}>{v(data.cus_order_no)}</Text>
-            </View>
-          </View>
-          <View style={s.infoRow}>
-            <View style={s.infoCell}>
-              <Text style={s.infoLabel}>CUS. ORDER DATE:</Text>
-              <Text style={s.infoValue}>{formatDate(data.cus_order_date)}</Text>
-            </View>
-            <View style={s.infoCellLast}>
-              <Text style={s.infoLabel}>Cust. Item No / Part code</Text>
-              <Text style={s.infoValue}>{v(data.cust_part_code)}</Text>
-            </View>
-          </View>
-          <View style={s.infoRow}>
-            <View style={s.infoCell}>
-              <Text style={s.infoLabel}>W.O. NO.</Text>
-              <Text style={s.infoValue}>{v(data.wo_number)}</Text>
-            </View>
-            <View style={s.infoCellLast}>
-              <Text style={s.infoLabel}>PO ITEM NO.</Text>
-              <Text style={s.infoValue}>{v(data.po_item_no)}</Text>
-            </View>
-          </View>
-          <View style={s.infoRow}>
-            <View style={s.infoCell}>
-              <Text style={s.infoLabel}>ITEM NO :-</Text>
-              <Text style={s.infoValue}>{v(data.item_no)}</Text>
-            </View>
-            <View style={s.infoCellLast}>
-              <Text style={s.infoLabel}>CT TYPE</Text>
-              <Text style={s.infoValue}>{v(data.ct_type)}</Text>
-            </View>
-          </View>
-          <View style={s.infoRowLast}>
-            <View style={s.infoCell}>
-              <Text style={s.infoLabel}>QTY :-</Text>
-              <Text style={s.infoValue}>{v(data.quantity)}</Text>
-            </View>
-            <View style={s.infoCellLast}>
-              <Text style={s.infoLabel}>Sr. No.</Text>
-              <Text style={s.infoValue}>{v(data.serial_number)}</Text>
-            </View>
-          </View>
+          {[
+            [
+              { label: "CUSTOMER NAME",          val: v(data.customer_name),         last: false },
+              { label: "CUS. ORDER. NO.",         val: v(data.cus_order_no),          last: true  },
+            ],
+            [
+              { label: "CUS. ORDER DATE",         val: formatDate(data.cus_order_date), last: false },
+              { label: "Cust. Item No / Part code", val: v(data.cust_part_code),      last: true  },
+            ],
+            [
+              { label: "W.O. NO.",                val: v(data.wo_number),             last: false },
+              { label: "PO ITEM NO.",              val: v(data.po_item_no),            last: true  },
+            ],
+            [
+              { label: "ITEM NO",                 val: v(data.item_no),               last: false },
+              { label: "CT TYPE",                 val: v(data.ct_type),               last: true  },
+            ],
+            [
+              { label: "QTY",                     val: data.quantity ? `${v(data.quantity)} NOS` : "", last: false },
+              { label: "Sr. No.",                 val: v(data.serial_number),         last: true  },
+            ],
+          ].map((rowCells, ri, arr) => {
+            const isLastRow = ri === arr.length - 1;
+            return (
+              <View key={ri} style={isLastRow ? s.infoRowLast : s.infoRow}>
+                {rowCells.map((cell) => (
+                  <View key={cell.label} style={cell.last ? s.infoCellLast : s.infoCell}>
+                    <View style={s.infoInlineRow}>
+                      <Text style={s.infoLabel}>{cell.label}</Text>
+                      <Text style={s.infoColon}> :</Text>
+                      <Text style={s.infoValue}> {cell.val}</Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            );
+          })}
         </View>
 
         {/* ── Electrical details ──────────────────────────────────────── */}
         <View style={s.electricRow}>
           {[
-            { label: "RATIO :-",      value: v(data.ratio) },
-            { label: "RATED VOLTAGE", value: v(data.rated_voltage) },
-            { label: "STC",           value: v(data.stc) },
-            { label: "I.L.",          value: v(data.insulation_level) },
-            { label: "FREQ.",         value: v(data.frequency) },
+            { label: "RATIO",         value: v(data.ratio),             last: false },
+            { label: "RATED VOLTAGE", value: v(data.rated_voltage),     last: false },
+            { label: "STC",           value: v(data.stc),               last: false },
+            { label: "I.L.",          value: v(data.insulation_level),  last: false },
+            { label: "FREQ.",         value: v(data.frequency),         last: false },
+            { label: "REF. STD.",     value: v(data.ref_std),           last: true  },
           ].map((f) => (
-            <View key={f.label} style={s.eCell}>
-              <Text style={s.eCellLabel}>{f.label}</Text>
-              <Text style={s.eCellValue}>{f.value}</Text>
+            <View key={f.label} style={f.last ? s.eCellLast : s.eCell}>
+              <View style={s.infoInlineRow}>
+                <Text style={s.eCellLabel}>{f.label}</Text>
+                <Text style={s.infoColon}> :</Text>
+                <Text style={s.eCellValue}> {f.value}</Text>
+              </View>
             </View>
           ))}
-          <View style={s.eCellLast}>
-            <Text style={s.eCellLabel}>REF. STD.</Text>
-            <Text style={s.eCellValue}>{v(data.ref_std)}</Text>
-          </View>
         </View>
 
         {/* ── Core Particulars table ──────────────────────────────────── */}
