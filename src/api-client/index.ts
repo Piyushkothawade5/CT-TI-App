@@ -96,6 +96,8 @@ export interface TiRecordInput {
   checked_by?: string;
   approved_by?: string;
   remarks?: string;
+  rev_no?: string;
+  note?: string;
   [key: string]: unknown;
 }
 
