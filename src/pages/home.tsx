@@ -485,9 +485,9 @@ export default function Home() {
                 <SectionHeader title="CUSTOMER DETAILS" />
                 <div className="grid grid-cols-2 gap-x-8 gap-y-4">
                   <FormField form={form} name="customer_name" label="Customer Name" disabled={!isFormEnabled} />
-                  <FormField form={form} name="cus_order_date" label="Customer Order Date" type="date" disabled={!isFormEnabled} />
-                  <FormField form={form} name="cus_order_no" label="Customer Order No." disabled={!isFormEnabled} />
                   <FormField form={form} name="cust_part_code" label="Cust. Part Name/Item No." disabled={!isFormEnabled} />
+                  <FormField form={form} name="cus_order_no" label="Customer Order No." disabled={!isFormEnabled} />
+                  <FormField form={form} name="cus_order_date" label="Customer Order Date" type="date" disabled={!isFormEnabled} />
                 </div>
               </section>
 
@@ -495,6 +495,7 @@ export default function Home() {
               <section className="print-break-inside-avoid">
                 <SectionHeader title="ORDER DETAILS" />
                 <div className="grid grid-cols-2 gap-x-8 gap-y-4">
+                  <FormField form={form} name="wo_number" label="W.O. Number" disabled={!isFormEnabled} />
                   <div className="space-y-1">
                     <Label className="text-xs font-semibold text-gray-600 uppercase tracking-wider">CT Type</Label>
                     <Controller
@@ -519,7 +520,6 @@ export default function Home() {
                       )}
                     />
                   </div>
-                  <FormField form={form} name="wo_number" label="W.O. Number" disabled={!isFormEnabled} />
                   <FormField form={form} name="po_item_no" label="PO Item No." disabled={!isFormEnabled} />
                   <FormField form={form} name="serial_number" label="Serial Number" disabled={!isFormEnabled} />
                   <FormField form={form} name="quantity" label="Quantity" disabled={!isFormEnabled} />
