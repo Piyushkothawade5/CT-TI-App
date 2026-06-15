@@ -67,9 +67,9 @@ export interface TiRecordInput {
   item_no?: string;
   ti_no?: string;
   ti_date?: string;
-  wo_no?: string;
+  wo_number?: string;
   customer_name?: string;
-  qty?: string;
+  quantity?: string;
   ct_type?: string;
   cust_part_code?: string;
   ratio?: string;
@@ -146,15 +146,22 @@ function incrementTiCounter(): number {
   return next;
 }
 
-function generateTiNo(): string {
+function formatTiNo(seq: number): string {
   const now = new Date();
   const m = now.getMonth() + 1;
   const y = now.getFullYear() % 100;
   const fyS = m >= 4 ? y : y - 1;
   const fyE = fyS + 1;
   const fy = `${String(fyS).padStart(2, "0")}-${String(fyE).padStart(2, "0")}`;
-  const seq = incrementTiCounter();
   return `TI/${fy}/${String(seq).padStart(4, "0")}`;
+}
+
+function previewTiNo(): string {
+  return formatTiNo(getTiCounter() + 1);
+}
+
+function generateTiNo(): string {
+  return formatTiNo(incrementTiCounter());
 }
 
 // ─── Query key factories ──────────────────────────────────────────────────────
@@ -253,7 +260,7 @@ export function useListTiRecords(
       }
       if (filters.woNo) {
         records = records.filter((r) =>
-          r.wo_no?.toLowerCase().includes(filters.woNo!.toLowerCase())
+          r.wo_number?.toLowerCase().includes(filters.woNo!.toLowerCase())
         );
       }
       if (filters.ctType) {
@@ -271,7 +278,7 @@ export function useListTiRecords(
 export function useGenerateTiNumber() {
   return useMutation({
     mutationFn: async (_args: Record<string, never>) => {
-      return { ti_no: generateTiNo() };
+      return { ti_no: previewTiNo() };
     },
   });
 }
@@ -281,7 +288,14 @@ export function useCreateTiRecord() {
   return useMutation({
     mutationFn: async ({ data }: { data: TiRecordInput }) => {
       const records = getTiRecords();
-      const tiNo = data.ti_no || generateTiNo();
+      let tiNo = data.ti_no;
+      if (tiNo) {
+        if (tiNo === previewTiNo()) {
+          incrementTiCounter();
+        }
+      } else {
+        tiNo = generateTiNo();
+      }
       const newRecord: TiRecord = {
         ...data,
         id: crypto.randomUUID(),
