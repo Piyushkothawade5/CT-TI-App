@@ -7,8 +7,8 @@ import type { TiRecordInput, CoreData } from "@/api-client";
 // A4 = 841.89pt. Fixed sections ≈ 277pt. 37 row slots → rowHeight = 15.3pt
 // ─────────────────────────────────────────────────────────────────────────────
 const BLACK      = "#000000";
-const FONT_SIZE  = 8;
-const LABEL_SIZE = 7.5;
+const FONT_SIZE  = 9;
+const LABEL_SIZE = 8;
 const PAD_H      = 4;
 const PAD_V      = 2;
 const PAGE_PAD_H = 20;
