@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useForm, Controller } from "react-hook-form";
+import { useForm, Controller, useWatch } from "react-hook-form";
 import {
   Save, FilePlus, Search, ChevronLeft, ChevronRight, Edit3, Printer, FileText, Settings, X, PlusCircle
 } from "lucide-react";
@@ -17,11 +17,13 @@ import { SearchModal } from "@/components/ti-form/SearchModal";
 import { AddItemModal } from "@/components/ti-form/AddItemModal";
 import { downloadTiPdf, printTiPdf } from "@/components/ti-form/downloadTiPdf";
 
+// Index of the row after which the borderless separator row is inserted
+const SEPARATOR_AFTER_IDX = 6; // after "Max. Exc. C/n"
+
 const CORE_FIELDS: Array<{
   label: string;
   key: string;
-  companionKey?: string;
-  companionPlaceholder?: string;
+  isCheckboxVK2?: boolean; // special flag for the @VK/2 checkbox row
 }> = [
   { label: "RATIO", key: "ratio" },
   { label: "Burden (VA)", key: "burden_va" },
@@ -29,7 +31,8 @@ const CORE_FIELDS: Array<{
   { label: "ISF", key: "isf" },
   { label: "Min. Knee pt. volt.", key: "min_knee_pt_volt" },
   { label: "Max. Rct @ 75°c", key: "max_rct_75c" },
-  { label: "Max. Exc. C/n", key: "max_exc_vk2", companionKey: "max_exc_voltage", companionPlaceholder: "@ voltage (e.g. VK/2)" },
+  { label: "Max. Exc. C/n", key: "max_exc_vk2", isCheckboxVK2: true },
+  // ── separator row inserted after index 6 in render ──
   { label: "Core Dimensions (bare)", key: "bare_core_dim" },
   { label: "Core Material", key: "core_material" },
   { label: "Core weight (Kg)", key: "core_weight_kg" },
@@ -583,28 +586,45 @@ export default function Home() {
                     </thead>
                     <tbody>
                       {CORE_FIELDS.map((row, idx) => (
-                        <tr key={idx} className="bg-white border-b border-[#dee2e6] hover:bg-gray-50 transition-colors">
-                          <td className="px-4 py-1.5 font-medium text-gray-900 border-r border-[#dee2e6] bg-gray-50/50 whitespace-nowrap">
-                            {row.label}
-                          </td>
-                          {(["core1", "core2", "core3"] as const).map((coreKey, colIdx) => (
-                            <td key={coreKey} className={`p-0${colIdx < 2 ? " border-r border-[#dee2e6]" : ""}`}>
-                              {row.companionKey ? (
-                                <CompanionTableCell
-                                  form={form}
-                                  mainName={`${coreKey}.${row.key}`}
-                                  companionName={`${coreKey}.${row.companionKey}`}
-                                  companionPlaceholder={row.companionPlaceholder}
-                                  disabled={!isFormEnabled}
-                                  gridRow={idx}
-                                  gridCol={colIdx}
-                                />
-                              ) : (
-                                <TableInput form={form} name={`${coreKey}.${row.key}`} disabled={!isFormEnabled} gridRow={idx} gridCol={colIdx} />
-                              )}
+                        <React.Fragment key={idx}>
+                          <tr className="bg-white border-b border-[#dee2e6] hover:bg-gray-50 transition-colors">
+                            <td className="px-4 py-1.5 font-medium text-gray-900 border-r border-[#dee2e6] bg-gray-50/50 whitespace-nowrap">
+                              {row.label}
                             </td>
-                          ))}
-                        </tr>
+                            {(["core1", "core2", "core3"] as const).map((coreKey, colIdx) => (
+                              <td key={coreKey} className={`p-0${colIdx < 2 ? " border-r border-[#dee2e6]" : ""}`}>
+                                {row.isCheckboxVK2 ? (
+                                  <VK2CheckboxCell
+                                    form={form}
+                                    mainName={`${coreKey}.${row.key}`}
+                                    checkboxName={`${coreKey}.max_exc_is_vk2`}
+                                    disabled={!isFormEnabled}
+                                    gridRow={idx}
+                                    gridCol={colIdx}
+                                  />
+                                ) : (
+                                  <TableInput
+                                    form={form}
+                                    name={`${coreKey}.${row.key}`}
+                                    disabled={!isFormEnabled}
+                                    gridRow={idx}
+                                    gridCol={colIdx}
+                                  />
+                                )}
+                              </td>
+                            ))}
+                          </tr>
+                          {/* Separator row after Max. Exc. C/n — no internal vertical borders,
+                              but HAS border-b so Core Dimensions keeps its top border */}
+                          {idx === SEPARATOR_AFTER_IDX && (
+                            <tr className="bg-white border-b border-[#dee2e6]">
+                              <td className="px-4 py-[3px] bg-gray-50/50" />
+                              <td className="py-[3px]" />
+                              <td className="py-[3px]" />
+                              <td className="py-[3px]" />
+                            </tr>
+                          )}
+                        </React.Fragment>
                       ))}
                     </tbody>
                   </table>
@@ -757,17 +777,26 @@ function FormField({ form, name, label, type = "text", disabled, dataField }: { 
   );
 }
 
-function CompanionTableCell({ form, mainName, companionName, companionPlaceholder, disabled, gridRow, gridCol }: {
+/** 
+ * VK2CheckboxCell — renders the Max. Exc. C/n value input + a "@VK/2" checkbox below it.
+ * The checkbox is ONLY shown when the main field has a non-empty value.
+ * The checkbox value is stored in core[N].max_exc_is_vk2 as "true" | "".
+ */
+function VK2CheckboxCell({ form, mainName, checkboxName, disabled, gridRow, gridCol }: {
   form: any;
   mainName: string;
-  companionName: string;
-  companionPlaceholder?: string;
+  checkboxName: string;
   disabled?: boolean;
   gridRow?: number;
   gridCol?: number;
 }) {
+  // Watch the main field value reactively so the checkbox shows/hides live
+  const mainValue = useWatch({ control: form.control, name: mainName });
+  const hasValue = !!(mainValue && String(mainValue).trim() !== "");
+
   return (
-    <div className="flex flex-col divide-y divide-gray-100">
+    <div className="flex flex-col">
+      {/* Main value input */}
       <Controller
         name={mainName}
         control={form.control}
@@ -782,19 +811,28 @@ function CompanionTableCell({ form, mainName, companionName, companionPlaceholde
           />
         )}
       />
-      <Controller
-        name={companionName}
-        control={form.control}
-        render={({ field }) => (
-          <Input
-            {...field}
-            value={field.value || ""}
-            disabled={disabled}
-            placeholder={disabled ? "" : companionPlaceholder}
-            className="border-0 shadow-none h-6 rounded-none text-[11px] text-gray-400 focus-visible:ring-1 focus-visible:ring-[#4a6fa5] focus-visible:ring-inset focus-visible:z-10 bg-transparent disabled:opacity-100 disabled:cursor-default px-3 print:px-1 placeholder:text-gray-300 italic"
-          />
-        )}
-      />
+      {/* @VK/2 checkbox — only visible when field has a value */}
+      {hasValue && (
+        <Controller
+          name={checkboxName}
+          control={form.control}
+          render={({ field }) => {
+            const checked = field.value === "true" || field.value === true;
+            return (
+              <label className={`flex items-center gap-1.5 px-3 py-[3px] border-t border-gray-100 cursor-pointer select-none ${disabled ? "opacity-60 cursor-default pointer-events-none" : "hover:bg-blue-50/50"}`}>
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  disabled={disabled}
+                  onChange={(e) => field.onChange(e.target.checked ? "true" : "")}
+                  className="w-3 h-3 accent-[#4a6fa5] cursor-pointer"
+                />
+                <span className="text-[10px] text-gray-500 italic font-medium">@VK/2</span>
+              </label>
+            );
+          }}
+        />
+      )}
     </div>
   );
 }
