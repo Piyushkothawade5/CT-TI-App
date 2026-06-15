@@ -16,6 +16,7 @@ export interface CoreData {
   min_knee_pt_volt?: string;
   max_rct_75c?: string;
   max_exc_vk2?: string;
+  max_exc_is_vk2?: string;
   bare_core_dim?: string;
   core_material?: string;
   core_weight_kg?: string;
@@ -61,6 +62,8 @@ export interface ItemInput {
   pri_weight?: string;
   sec_terminal?: string;
   total_weight?: string;
+  // customer association stored on item for auto-population
+  default_customer?: string;
 }
 
 export interface TiRecordInput {
@@ -69,9 +72,13 @@ export interface TiRecordInput {
   ti_date?: string;
   wo_number?: string;
   customer_name?: string;
+  cus_order_no?: string;
+  cus_order_date?: string;
   quantity?: string;
   ct_type?: string;
   cust_part_code?: string;
+  po_item_no?: string;
+  serial_number?: string;
   ratio?: string;
   rated_voltage?: string;
   stc?: string;
@@ -164,6 +171,52 @@ function generateTiNo(): string {
   return formatTiNo(incrementTiCounter());
 }
 
+// ─── Distinct value helpers (for dropdowns/suggestions) ───────────────────────
+
+/** Get distinct non-empty values for a field across all TI records */
+export function getDistinctTiField(field: keyof TiRecordInput): string[] {
+  const records = getTiRecords();
+  const seen = new Set<string>();
+  for (const r of records) {
+    const v = r[field];
+    if (typeof v === "string" && v.trim()) seen.add(v.trim());
+  }
+  return Array.from(seen).sort();
+}
+
+/** Get distinct ct_type values from items table */
+export function getDistinctCtTypes(): string[] {
+  const items = getItems();
+  const seen = new Set<string>();
+  for (const item of items) {
+    if (item.ct_type?.trim()) seen.add(item.ct_type.trim());
+  }
+  return Array.from(seen).sort();
+}
+
+/** Get the most common customer name for an item code (from TI history) */
+export function getCustomerForItem(itemNo: string): string {
+  const records = getTiRecords();
+  const counts: Record<string, number> = {};
+  for (const r of records) {
+    if (r.item_no === itemNo && r.customer_name?.trim()) {
+      const c = r.customer_name.trim();
+      counts[c] = (counts[c] || 0) + 1;
+    }
+  }
+  let best = "";
+  let max = 0;
+  for (const [name, count] of Object.entries(counts)) {
+    if (count > max) { max = count; best = name; }
+  }
+  // Also check item's default_customer
+  if (!best) {
+    const item = getItems().find(i => i.item_no === itemNo);
+    best = item?.default_customer || "";
+  }
+  return best;
+}
+
 // ─── Query key factories ──────────────────────────────────────────────────────
 
 export function getGetItemQueryKey(itemNo: string) {
@@ -178,7 +231,7 @@ export function getGetTiRecordQueryKey(tiNo: string) {
 
 export function useGetItem(
   itemNo: string,
-  options?: { query?: { enabled?: boolean } }
+  options?: { query?: { enabled?: boolean; retry?: boolean } }
 ) {
   return useQuery({
     queryKey: getGetItemQueryKey(itemNo),
@@ -195,7 +248,7 @@ export function useGetItem(
 
 export function useGetTiRecord(
   tiNo: string,
-  options?: { query?: { enabled?: boolean } }
+  options?: { query?: { enabled?: boolean; retry?: boolean } }
 ) {
   return useQuery({
     queryKey: getGetTiRecordQueryKey(tiNo),
@@ -275,6 +328,24 @@ export function useListTiRecords(
   });
 }
 
+/** Hook to get all distinct values for a TI field (for autocomplete dropdowns) */
+export function useDistinctTiValues(field: keyof TiRecordInput) {
+  return useQuery({
+    queryKey: ["distinct-ti", field],
+    queryFn: () => getDistinctTiField(field),
+    staleTime: 5000,
+  });
+}
+
+/** Hook to get distinct CT types from items */
+export function useDistinctCtTypes() {
+  return useQuery({
+    queryKey: ["distinct-ct-types"],
+    queryFn: () => getDistinctCtTypes(),
+    staleTime: 5000,
+  });
+}
+
 export function useGenerateTiNumber() {
   return useMutation({
     mutationFn: async (_args: Record<string, never>) => {
@@ -310,10 +381,21 @@ export function useCreateTiRecord() {
       };
       records.push(newRecord);
       setTiRecords(records);
+      // Update item's default_customer if not already set
+      if (data.item_no && data.customer_name) {
+        const items = getItems();
+        const itemIdx = items.findIndex(i => i.item_no === data.item_no);
+        if (itemIdx !== -1 && !items[itemIdx].default_customer) {
+          items[itemIdx].default_customer = data.customer_name;
+          setItems(items);
+        }
+      }
       return newRecord;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["ti-records"] });
+      queryClient.invalidateQueries({ queryKey: ["distinct-ti"] });
+      queryClient.invalidateQueries({ queryKey: ["distinct-ct-types"] });
     },
   });
 }
@@ -337,6 +419,7 @@ export function useUpdateTiRecord() {
     },
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["ti-records"] });
+      queryClient.invalidateQueries({ queryKey: ["distinct-ti"] });
       queryClient.invalidateQueries({
         queryKey: getGetTiRecordQueryKey(variables.tiNo || ""),
       });
@@ -349,7 +432,11 @@ export function useCreateItem() {
   return useMutation({
     mutationFn: async ({ data }: { data: ItemInput }) => {
       const items = getItems();
-      const newItem: Item = { ...data, id: crypto.randomUUID() };
+      // Clean item_no: remove spaces, commas, full stops — pure numeric
+      const cleanedItemNo = data.item_no
+        .replace(/[\s,\.]+/g, "")
+        .replace(/[^0-9]/g, "");
+      const newItem: Item = { ...data, item_no: cleanedItemNo, id: crypto.randomUUID() };
       items.push(newItem);
       setItems(items);
       return newItem;
@@ -358,6 +445,7 @@ export function useCreateItem() {
       queryClient.invalidateQueries({
         queryKey: getGetItemQueryKey(variables.data.item_no),
       });
+      queryClient.invalidateQueries({ queryKey: ["distinct-ct-types"] });
     },
   });
 }
