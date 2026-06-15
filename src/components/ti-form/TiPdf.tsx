@@ -114,10 +114,11 @@ const s = StyleSheet.create({
     borderBottomWidth: 1, borderColor: BLACK, borderStyle: "solid",
     minHeight: ROW_H,
   },
+  // Separator row: outer left/right border from coreTable, NO bottom border, NO internal cell borders
   coreSepRow: {
     flexDirection: "row",
-    borderBottomWidth: 1, borderColor: BLACK, borderStyle: "solid",
     minHeight: SEP_H,
+    // deliberately no borderBottomWidth — outer coreTable handles left/right
   },
   colLabel: {
     width: "34%",
@@ -134,6 +135,19 @@ const s = StyleSheet.create({
     fontSize: FONT_SIZE,
   },
   colCoreLast: {
+    flex: 1,
+    paddingHorizontal: PAD_H,
+    paddingVertical: PAD_V,
+    fontSize: FONT_SIZE,
+  },
+  // Separator variant — no internal vertical borders
+  colLabelSep: {
+    width: "34%",
+    paddingHorizontal: PAD_H,
+    paddingVertical: PAD_V,
+    fontSize: LABEL_SIZE,
+  },
+  colCoreSep: {
     flex: 1,
     paddingHorizontal: PAD_H,
     paddingVertical: PAD_V,
@@ -206,6 +220,21 @@ function formatDate(dateStr?: string | null): string {
   } catch { return dateStr; }
 }
 
+/**
+ * Determine whether @VK/2 is checked for ANY of the three cores.
+ * If any core has max_exc_is_vk2 === "true", the PDF label gets the suffix.
+ */
+function isVK2Checked(c1: CoreData, c2: CoreData, c3: CoreData): boolean {
+  return (
+    (c1 as any).max_exc_is_vk2 === "true" ||
+    (c1 as any).max_exc_is_vk2 === true ||
+    (c2 as any).max_exc_is_vk2 === "true" ||
+    (c2 as any).max_exc_is_vk2 === true ||
+    (c3 as any).max_exc_is_vk2 === "true" ||
+    (c3 as any).max_exc_is_vk2 === true
+  );
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // ROW DEFINITIONS  (fixed — never changes)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -224,7 +253,7 @@ function buildRows(data: TiRecordInput, maxExcLabel: string): CoreRow[] {
     { type: "core",   label: "Min. Knee pt. volt.",     key: "min_knee_pt_volt" },
     { type: "core",   label: "Max. Rct @ 75\u00b0c",   key: "max_rct_75c" },
     { type: "core",   label: maxExcLabel,               key: "max_exc_vk2" },
-    // ── separator ───────────────────────────────────────────────────────────
+    // ── separator (no internal borders) ─────────────────────────────────────
     { type: "separator" },
     // ── 18 more core rows ───────────────────────────────────────────────────
     { type: "core",   label: "Core Dimensions",         key: "bare_core_dim" },
@@ -273,9 +302,13 @@ export function TiPdfDocument({ data }: Props) {
   const c2 = (data.core2 ?? {}) as CoreData;
   const c3 = (data.core3 ?? {}) as CoreData;
 
-  const maxExcVoltage = c1.max_exc_voltage || c2.max_exc_voltage || c3.max_exc_voltage;
-  const maxExcLabel   = `Max. Exc. C/n. :- @${maxExcVoltage || "VK/2"}`;
-  const rows          = buildRows(data, maxExcLabel);
+  // Determine PDF label for Max. Exc. C/n based on checkbox state
+  const vk2Checked  = isVK2Checked(c1, c2, c3);
+  const maxExcLabel = vk2Checked
+    ? "Max. Exc. C/n. :- @VK/2"
+    : "Max. Exc. C/n.";
+
+  const rows = buildRows(data, maxExcLabel);
 
   return (
     <Document>
@@ -377,11 +410,12 @@ export function TiPdfDocument({ data }: Props) {
           {rows.map((row, idx) => {
             if (row.type === "separator") {
               return (
+                // No internal cell borders, no bottom border — outer coreTable border holds sides
                 <View key={`sep-${idx}`} style={s.coreSepRow}>
-                  <View style={s.colLabel} />
-                  <View style={s.colCore} />
-                  <View style={s.colCore} />
-                  <View style={s.colCoreLast} />
+                  <View style={s.colLabelSep} />
+                  <View style={s.colCoreSep} />
+                  <View style={s.colCoreSep} />
+                  <View style={s.colCoreSep} />
                 </View>
               );
             }
