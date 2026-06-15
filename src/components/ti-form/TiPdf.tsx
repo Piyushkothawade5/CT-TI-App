@@ -111,14 +111,16 @@ const s = StyleSheet.create({
   },
   coreRow: {
     flexDirection: "row",
-    borderBottomWidth: 1, borderColor: BLACK, borderStyle: "solid",
     minHeight: ROW_H,
   },
-  // Separator row: outer left/right border from coreTable, NO bottom border, NO internal cell borders
+  // Separator row: has bottom border to act as top border of next row,
+  // and internal cell borders to maintain vertical lines
   coreSepRow: {
     flexDirection: "row",
     minHeight: SEP_H,
-    // deliberately no borderBottomWidth — outer coreTable handles left/right
+    borderBottomWidth: 1,
+    borderColor: BLACK,
+    borderStyle: "solid",
   },
   colLabel: {
     width: "34%",
@@ -140,7 +142,7 @@ const s = StyleSheet.create({
     paddingVertical: PAD_V,
     fontSize: FONT_SIZE,
   },
-  // Separator variant — no internal vertical borders
+  // Separator variant — no internal vertical borders by default (overridden inline)
   colLabelSep: {
     width: "34%",
     paddingHorizontal: PAD_H,
@@ -247,13 +249,13 @@ function buildRows(data: TiRecordInput, maxExcLabel: string): CoreRow[] {
   return [
     // ── 7 core-specific rows ────────────────────────────────────────────────
     { type: "core",   label: "RATIO",                  key: "ratio" },
-    { type: "core",   label: "Burden (VA)",             key: "burden_va" },
-    { type: "core",   label: "Accuracy Class",          key: "accuracy_class" },
-    { type: "core",   label: "ISF",                     key: "isf" },
-    { type: "core",   label: "Min. Knee pt. volt.",     key: "min_knee_pt_volt" },
-    { type: "core",   label: "Max. Rct @ 75\u00b0c",   key: "max_rct_75c" },
-    { type: "core",   label: maxExcLabel,               key: "max_exc_vk2" },
-    // ── separator (no internal borders) ─────────────────────────────────────
+    { type: "core",   label: "Burden (VA)",            key: "burden_va" },
+    { type: "core",   label: "Accuracy Class",         key: "accuracy_class" },
+    { type: "core",   label: "ISF",                    key: "isf" },
+    { type: "core",   label: "Min. Knee pt. volt.",    key: "min_knee_pt_volt" },
+    { type: "core",   label: "Max. Rct @ 75°c",        key: "max_rct_75c" },
+    { type: "core",   label: maxExcLabel,              key: "max_exc_vk2" },
+    // ── separator ───────────────────────────────────────────────────────────
     { type: "separator" },
     // ── 18 more core rows ───────────────────────────────────────────────────
     { type: "core",   label: "Core Dimensions",         key: "bare_core_dim" },
@@ -277,15 +279,15 @@ function buildRows(data: TiRecordInput, maxExcLabel: string): CoreRow[] {
     // ── 11 single rows ──────────────────────────────────────────────────────
     { type: "single", label: "CT final dim",  value: v(data.ct_final_dim) },
     { type: "single", label: "GA Drg",        value: v(data.ga_drg) },
-    { type: "single", label: "INS CLASS",      value: v(data.ins_class) },
-    { type: "single", label: "PRI Turns",      value: v(data.pri_turns) },
-    { type: "single", label: "PRI Copper",     value: v(data.pri_copper) },
-    { type: "single", label: "Former",         value: v(data.former) },
-    { type: "single", label: "PRI Length",     value: v(data.pri_length) },
-    { type: "single", label: "PRI Weight",     value: v(data.pri_weight) },
-    { type: "single", label: "Sec. Terminal",  value: v(data.sec_terminal) },
-    { type: "single", label: "Total Weight",   value: v(data.total_weight) },
-    { type: "single", label: "Ref TI",         value: v(data.ref_ti) },
+    { type: "single", label: "INS CLASS",     value: v(data.ins_class) },
+    { type: "single", label: "PRI Turns",     value: v(data.pri_turns) },
+    { type: "single", label: "PRI Copper",    value: v(data.pri_copper) },
+    { type: "single", label: "Former",        value: v(data.former) },
+    { type: "single", label: "PRI Length",    value: v(data.pri_length) },
+    { type: "single", label: "PRI Weight",    value: v(data.pri_weight) },
+    { type: "single", label: "Sec. Terminal", value: v(data.sec_terminal) },
+    { type: "single", label: "Total Weight",  value: v(data.total_weight) },
+    { type: "single", label: "Ref TI",        value: v(data.ref_ti) },
     // Total: 7 + 1sep + 18 + 11 = 37 slots × 15.3pt = 566pt ✅
   ];
 }
@@ -337,23 +339,23 @@ export function TiPdfDocument({ data }: Props) {
           {([
             [
               { label: "CUSTOMER NAME",            val: v(data.customer_name),           last: false },
-              { label: "CUS. ORDER. NO.",           val: v(data.cus_order_no),            last: true  },
+              { label: "CUS. ORDER. NO.",          val: v(data.cus_order_no),            last: true  },
             ],
             [
-              { label: "CUS. ORDER DATE",           val: formatDate(data.cus_order_date), last: false },
-              { label: "Cust. Item No / Part code", val: v(data.cust_part_code),          last: true  },
+              { label: "CUS. ORDER DATE",          val: formatDate(data.cus_order_date), last: false },
+              { label: "Cust. Item No / Part code", val: v(data.cust_part_code),         last: true  },
             ],
             [
-              { label: "W.O. NO.",                  val: v(data.wo_number),               last: false },
-              { label: "PO ITEM NO.",                val: v(data.po_item_no),              last: true  },
+              { label: "W.O. NO.",                 val: v(data.wo_number),               last: false },
+              { label: "PO ITEM NO.",              val: v(data.po_item_no),              last: true  },
             ],
             [
-              { label: "ITEM NO",                   val: v(data.item_no),                 last: false },
-              { label: "CT TYPE",                   val: v(data.ct_type),                 last: true  },
+              { label: "ITEM NO",                  val: v(data.item_no),                 last: false },
+              { label: "CT TYPE",                  val: v(data.ct_type),                 last: true  },
             ],
             [
-              { label: "QTY",                       val: v(data.quantity),                last: false },
-              { label: "Sr. No.",                   val: v(data.serial_number),           last: true  },
+              { label: "QTY",                      val: v(data.quantity),                last: false },
+              { label: "Sr. No.",                  val: v(data.serial_number),           last: true  },
             ],
           ] as Array<Array<{ label: string; val: string; last: boolean }>>).map((rowCells, ri, arr) => (
             <View key={ri} style={ri === arr.length - 1 ? s.infoRowLast : s.infoRow}>
@@ -406,36 +408,72 @@ export function TiPdfDocument({ data }: Props) {
             </View>
           </View>
 
-          {/* Rows */}
-          {rows.map((row, idx) => {
-            if (row.type === "separator") {
-              return (
-                // No internal cell borders, no bottom border — outer coreTable border holds sides
-                <View key={`sep-${idx}`} style={s.coreSepRow}>
-                  <View style={s.colLabelSep} />
-                  <View style={s.colCoreSep} />
-                  <View style={s.colCoreSep} />
-                  <View style={s.colCoreSep} />
-                </View>
-              );
-            }
-            if (row.type === "core") {
-              return (
-                <View key={idx} style={s.coreRow}>
-                  <View style={s.colLabel}><Text>{row.label}</Text></View>
-                  <View style={s.colCore}><Text>{v(c1[row.key])}</Text></View>
-                  <View style={s.colCore}><Text>{v(c2[row.key])}</Text></View>
-                  <View style={s.colCoreLast}><Text>{v(c3[row.key])}</Text></View>
-                </View>
-              );
-            }
-            return (
-              <View key={idx} style={s.coreRow}>
-                <View style={s.colLabel}><Text>{row.label}</Text></View>
-                <View style={s.colSpanned}><Text>{row.value}</Text></View>
-              </View>
-            );
-          })}
+{/* Rows */}
+{rows.map((row, idx) => {
+  if (row.type === "separator") {
+    return (
+      <View key={`sep-${idx}`} style={{ minHeight: SEP_H }} />
+    );
+  }
+
+  if (row.type === "core") {
+    const isCoreDimensionsRow = row.label === "Core Dimensions";
+
+    return (
+      <View
+        key={idx}
+        style={[
+          s.coreRow,
+          {
+            borderBottomWidth: 1,
+            borderColor: BLACK,
+            borderStyle: "solid",
+          },
+          isCoreDimensionsRow && {
+            borderTopWidth: 1,
+            borderColor: BLACK,
+            borderStyle: "solid",
+          },
+        ]}
+      >
+        <View style={s.colLabel}>
+          <Text>{row.label}</Text>
+        </View>
+        <View style={s.colCore}>
+          <Text>{v(c1[row.key])}</Text>
+        </View>
+        <View style={s.colCore}>
+          <Text>{v(c2[row.key])}</Text>
+        </View>
+        <View style={s.colCoreLast}>
+          <Text>{v(c3[row.key])}</Text>
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View
+      key={idx}
+      style={[
+        s.coreRow,
+        {
+          borderBottomWidth: 1,
+          borderColor: BLACK,
+          borderStyle: "solid",
+        },
+      ]}
+    >
+      <View style={s.colLabel}>
+        <Text>{row.label}</Text>
+      </View>
+      <View style={s.colSpanned}>
+        <Text>{row.value}</Text>
+      </View>
+    </View>
+  );
+})}
+
         </View>
 
         {/* ── NOTE & REV ──────────────────────────────────────────────────── */}
