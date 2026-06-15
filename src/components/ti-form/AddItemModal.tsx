@@ -48,10 +48,12 @@ export function AddItemModal({ open, onOpenChange, itemNo, onSuccess }: { open: 
     }
   });
 
-  // Update itemNo in form when prop changes
+  // Start every new item entry with a clean form.
   React.useEffect(() => {
-    form.setValue("item_no", itemNo);
-  }, [itemNo]);
+    if (open) {
+      form.reset({ item_no: itemNo });
+    }
+  }, [form, itemNo, open]);
 
   const handleSave = async () => {
     try {
@@ -72,6 +74,9 @@ export function AddItemModal({ open, onOpenChange, itemNo, onSuccess }: { open: 
     if (!ARROWS.includes(e.key)) return;
 
     const target = e.target as HTMLElement;
+    const formRoot = target.closest("#add-item-form");
+    if (!formRoot) return;
+
     const tag = target.tagName.toLowerCase();
     if (tag !== "input" && tag !== "textarea" && tag !== "select") return;
 
@@ -87,7 +92,7 @@ export function AddItemModal({ open, onOpenChange, itemNo, onSuccess }: { open: 
         case "Enter":
           // Special case: if on last row (Wire Colour) and ENTER is pressed, jump to CT Final Dim
           if (e.key === "Enter" && gridRow === NUM_CORE_ROWS - 1) {
-            const ctFinalDim = document.querySelector<HTMLElement>('[data-field="ct_final_dim"]');
+            const ctFinalDim = formRoot.querySelector<HTMLElement>('[data-field="ct_final_dim"]');
             ctFinalDim?.focus();
             return;
           }
@@ -105,16 +110,14 @@ export function AddItemModal({ open, onOpenChange, itemNo, onSuccess }: { open: 
           else if (gridRow > 0) { nr = gridRow - 1; nc = NUM_CORE_COLS - 1; }
           break;
       }
-      const next = document.querySelector<HTMLElement>(
+      const next = formRoot.querySelector<HTMLElement>(
         `[data-grid-row="${nr}"][data-grid-col="${nc}"]`
       );
       next?.focus();
     } else {
       // ── Linear navigation for all other fields ──────────
-      const form = target.closest("#add-item-form");
-      if (!form) return;
       const all = Array.from(
-        form.querySelectorAll<HTMLElement>(
+        formRoot.querySelectorAll<HTMLElement>(
           "input:not([disabled]), select:not([disabled]), textarea:not([disabled])"
         )
       );
