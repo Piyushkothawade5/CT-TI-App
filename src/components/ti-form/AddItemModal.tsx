@@ -147,6 +147,7 @@ export function AddItemModal({ open, onOpenChange, itemNo, onSuccess }: {
                       className="h-9 bg-white"
                       placeholder={distinctCtTypes.length ? "Type or select..." : "Type CT type..."}
                       onFocus={() => setCtTypeOpen(true)}
+                      onBlur={() => setTimeout(() => setCtTypeOpen(false), 100)}
                       onChange={e => { field.onChange(e.target.value); setCtQuery(e.target.value); setCtTypeOpen(true); }}
                     />
                   )} />
