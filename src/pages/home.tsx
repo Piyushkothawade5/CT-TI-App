@@ -331,18 +331,26 @@ export default function Home() {
     catch (err) { toast({ title: "PDF failed", description: String(err), variant: "destructive" }); }
   };
 
-  const focusAndCenter = (element: HTMLElement | null) => {
+  const revealIfNeeded = (element: HTMLElement | null) => {
+    if (!element) return;
+    const rect = element.getBoundingClientRect();
+    const topComfort = 120;
+    const bottomComfort = window.innerHeight - 140;
+    if (rect.top < topComfort || rect.bottom > bottomComfort) {
+      element.scrollIntoView({ block: "center", inline: "nearest", behavior: "smooth" });
+    }
+  };
+
+  const focusAndReveal = (element: HTMLElement | null) => {
     if (!element) return;
     element.focus({ preventScroll: true });
-    requestAnimationFrame(() => {
-      element.scrollIntoView({ block: "center", inline: "nearest", behavior: "smooth" });
-    });
+    requestAnimationFrame(() => revealIfNeeded(element));
   };
 
   const focusFieldByName = (name: string) => {
     requestAnimationFrame(() => {
       const field = document.querySelector<HTMLElement>(`#ti-form [name="${name}"]`);
-      focusAndCenter(field);
+      focusAndReveal(field);
     });
   };
 
@@ -350,9 +358,7 @@ export default function Home() {
     const target = e.target as HTMLElement;
     const tag = target.tagName.toLowerCase();
     if (tag !== "input" && tag !== "textarea" && tag !== "select") return;
-    requestAnimationFrame(() => {
-      target.scrollIntoView({ block: "center", inline: "nearest", behavior: "smooth" });
-    });
+    requestAnimationFrame(() => revealIfNeeded(target));
   };
 
   // ── Arrow-key navigation ────────────────────────────────────────────────────
@@ -374,7 +380,7 @@ export default function Home() {
       switch (e.key) {
         case "ArrowDown": case "Enter":
           if (e.key === "Enter" && gridRow === NUM_CORE_ROWS - 1) {
-            focusAndCenter(root.querySelector<HTMLElement>('[data-field="ct_final_dim"]')); return;
+            focusAndReveal(root.querySelector<HTMLElement>('[data-field="ct_final_dim"]')); return;
           }
           nr = Math.min(gridRow + 1, NUM_CORE_ROWS - 1); break;
         case "ArrowUp": nr = Math.max(gridRow - 1, 0); break;
@@ -385,15 +391,15 @@ export default function Home() {
           if (gridCol > 0) nc = gridCol - 1;
           else if (gridRow > 0) { nr = gridRow - 1; nc = NUM_CORE_COLS - 1; } break;
       }
-      focusAndCenter(root.querySelector<HTMLElement>(`[data-grid-row="${nr}"][data-grid-col="${nc}"]`));
+      focusAndReveal(root.querySelector<HTMLElement>(`[data-grid-row="${nr}"][data-grid-col="${nc}"]`));
     } else {
       const all = Array.from(root.querySelectorAll<HTMLElement>("input:not([disabled]), select:not([disabled]), textarea:not([disabled])"));
       const idx = all.indexOf(target);
       if (idx === -1) return;
       const isNext = e.key === "ArrowDown" || e.key === "ArrowRight" || e.key === "Enter";
       const isPrev = e.key === "ArrowUp" || e.key === "ArrowLeft";
-      if (isNext && idx < all.length - 1) { e.preventDefault(); focusAndCenter(all[idx + 1]); }
-      if (isPrev && idx > 0) { e.preventDefault(); focusAndCenter(all[idx - 1]); }
+      if (isNext && idx < all.length - 1) { e.preventDefault(); focusAndReveal(all[idx + 1]); }
+      if (isPrev && idx > 0) { e.preventDefault(); focusAndReveal(all[idx - 1]); }
     }
   };
 
