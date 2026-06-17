@@ -85,8 +85,7 @@ export default function Home() {
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
   const [isAddItemModalOpen, setIsAddItemModalOpen] = useState(false);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
-  const itemNoInputRef = useRef<HTMLInputElement>(null);
-  const itemLoadScrollRef = useRef<number | null>(null);
+  const pendingItemFocusRef = useRef<string | null>(null);
 
   // Debounced TI number for duplicate checking
   const [debouncedTiNo, setDebouncedTiNo] = useState("");
@@ -170,13 +169,10 @@ export default function Home() {
         // Pre-fill customer if found, but user can override
         customer_name: historicCustomer || current.customer_name || "",
       });
-      if (itemLoadScrollRef.current !== null) {
-        const scrollY = itemLoadScrollRef.current;
-        itemLoadScrollRef.current = null;
-        requestAnimationFrame(() => {
-          itemNoInputRef.current?.focus({ preventScroll: true });
-          window.scrollTo({ top: scrollY, left: window.scrollX, behavior: "auto" });
-        });
+      if (pendingItemFocusRef.current) {
+        const nextField = pendingItemFocusRef.current;
+        pendingItemFocusRef.current = null;
+        focusFieldByName(nextField);
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -204,9 +200,9 @@ export default function Home() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tiRecordData]);
 
-  const handleItemSearch = (preserveScroll = false) => {
+  const handleItemSearch = (nextFocusName?: string) => {
     if (!itemNoInput.trim()) return;
-    if (preserveScroll) itemLoadScrollRef.current = window.scrollY;
+    pendingItemFocusRef.current = nextFocusName || null;
     // Clean item number: pure numeric
     const cleaned = itemNoInput.replace(/[\s,\.]+/g, "").replace(/[^0-9]/g, "");
     setItemNoInput(cleaned);
@@ -218,7 +214,7 @@ export default function Home() {
     if (e.key !== "Enter") return;
     e.preventDefault();
     e.stopPropagation();
-    handleItemSearch(true);
+    handleItemSearch("customer_name");
   };
 
   // Form is always visually enabled — no grey overlay after save
@@ -335,6 +331,30 @@ export default function Home() {
     catch (err) { toast({ title: "PDF failed", description: String(err), variant: "destructive" }); }
   };
 
+  const focusAndCenter = (element: HTMLElement | null) => {
+    if (!element) return;
+    element.focus({ preventScroll: true });
+    requestAnimationFrame(() => {
+      element.scrollIntoView({ block: "center", inline: "nearest", behavior: "smooth" });
+    });
+  };
+
+  const focusFieldByName = (name: string) => {
+    requestAnimationFrame(() => {
+      const field = document.querySelector<HTMLElement>(`#ti-form [name="${name}"]`);
+      focusAndCenter(field);
+    });
+  };
+
+  const handleFormFocus = (e: React.FocusEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement;
+    const tag = target.tagName.toLowerCase();
+    if (tag !== "input" && tag !== "textarea" && tag !== "select") return;
+    requestAnimationFrame(() => {
+      target.scrollIntoView({ block: "center", inline: "nearest", behavior: "smooth" });
+    });
+  };
+
   // ── Arrow-key navigation ────────────────────────────────────────────────────
   const NUM_CORE_ROWS = CORE_FIELDS.length;
   const NUM_CORE_COLS = 3;
@@ -354,7 +374,7 @@ export default function Home() {
       switch (e.key) {
         case "ArrowDown": case "Enter":
           if (e.key === "Enter" && gridRow === NUM_CORE_ROWS - 1) {
-            root.querySelector<HTMLElement>('[data-field="ct_final_dim"]')?.focus(); return;
+            focusAndCenter(root.querySelector<HTMLElement>('[data-field="ct_final_dim"]')); return;
           }
           nr = Math.min(gridRow + 1, NUM_CORE_ROWS - 1); break;
         case "ArrowUp": nr = Math.max(gridRow - 1, 0); break;
@@ -365,16 +385,15 @@ export default function Home() {
           if (gridCol > 0) nc = gridCol - 1;
           else if (gridRow > 0) { nr = gridRow - 1; nc = NUM_CORE_COLS - 1; } break;
       }
-      root.querySelector<HTMLElement>(`[data-grid-row="${nr}"][data-grid-col="${nc}"]`)?.focus();
+      focusAndCenter(root.querySelector<HTMLElement>(`[data-grid-row="${nr}"][data-grid-col="${nc}"]`));
     } else {
       const all = Array.from(root.querySelectorAll<HTMLElement>("input:not([disabled]), select:not([disabled]), textarea:not([disabled])"));
       const idx = all.indexOf(target);
       if (idx === -1) return;
-      if (e.key === "Enter") return;
-      const isNext = e.key === "ArrowDown" || e.key === "ArrowRight";
+      const isNext = e.key === "ArrowDown" || e.key === "ArrowRight" || e.key === "Enter";
       const isPrev = e.key === "ArrowUp" || e.key === "ArrowLeft";
-      if (isNext && idx < all.length - 1) { e.preventDefault(); all[idx + 1].focus(); }
-      if (isPrev && idx > 0) { e.preventDefault(); all[idx - 1].focus(); }
+      if (isNext && idx < all.length - 1) { e.preventDefault(); focusAndCenter(all[idx + 1]); }
+      if (isPrev && idx > 0) { e.preventDefault(); focusAndCenter(all[idx - 1]); }
     }
   };
 
@@ -394,7 +413,7 @@ export default function Home() {
       </div>
 
       {/* Main */}
-      <div id="ti-form" onKeyDown={handleArrowKey} className="ml-[60px] flex-1 p-6 flex justify-center">
+      <div id="ti-form" onKeyDown={handleArrowKey} onFocusCapture={handleFormFocus} className="ml-[60px] flex-1 p-6 flex justify-center">
         <div className="w-full max-w-5xl bg-white shadow-lg border border-gray-200">
           {/* Header */}
           <div className="bg-gradient-to-r from-[#3b5fc0] to-[#6b8dd6] p-6 text-white flex justify-between items-center">
@@ -433,14 +452,14 @@ export default function Home() {
             <div className="bg-blue-50 border border-blue-100 p-4 rounded-md">
               <Label className="text-lg font-bold text-[#2a4080] mb-2 block">Item Number</Label>
               <div className="flex space-x-2">
-                <Input ref={itemNoInputRef} value={itemNoInput}
+                <Input value={itemNoInput}
                   onChange={e => { setItemNoInput(e.target.value); form.setValue("item_no", e.target.value); }}
                   onBlur={() => handleItemSearch()}
                   onKeyDown={handleItemNoKeyDown}
                   placeholder="Enter numeric item number..."
                   className="text-lg py-6 max-w-sm border-[#4a6fa5] focus-visible:ring-[#4a6fa5]"
                   disabled={!isNewMode && !isEditMode} />
-                <Button onClick={() => handleItemSearch()} className="bg-[#4a6fa5] hover:bg-[#3b5fc0] h-auto px-6"
+                <Button onClick={() => handleItemSearch("customer_name")} className="bg-[#4a6fa5] hover:bg-[#3b5fc0] h-auto px-6"
                   disabled={!isNewMode && !isEditMode}>Load Item</Button>
               </div>
               {isItemError && <p className="text-red-500 text-sm mt-2 font-medium">Item not found. Please add it.</p>}
@@ -729,6 +748,7 @@ function AutocompleteField({ form, name, label, options, disabled, required, err
           className={`h-9 bg-gray-50 border-gray-300 focus-visible:ring-[#4a6fa5] disabled:bg-gray-50 disabled:text-gray-700 ${error ? "border-red-400" : ""}`}
           autoComplete="off"
           onFocus={() => { if (!disabled) setOpen(true); }}
+          onBlur={() => setTimeout(() => setOpen(false), 100)}
           onChange={e => { field.onChange(e.target.value); setQuery(e.target.value); setOpen(true); }}
         />
       )} />
@@ -785,6 +805,7 @@ function SuggestionField({ form, name, label, fetchField, disabled, required, er
           autoComplete="off"
           onChange={e => { field.onChange(e.target.value); setOpen(true); }}
           onFocus={() => { if (currentValue.length >= 3) setOpen(true); }}
+          onBlur={() => setTimeout(() => setOpen(false), 100)}
         />
       )} />
       {error && <p className="text-red-500 text-xs mt-0.5">{error}</p>}
