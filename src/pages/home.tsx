@@ -756,6 +756,15 @@ function AutocompleteField({ form, name, label, options, disabled, required, err
           onFocus={() => { if (!disabled) setOpen(true); }}
           onBlur={() => setTimeout(() => setOpen(false), 100)}
           onChange={e => { field.onChange(e.target.value); setQuery(e.target.value); setOpen(true); }}
+          onKeyDown={e => {
+            if (e.key === "Enter" && open && filtered.length === 1) {
+              e.preventDefault();
+              e.stopPropagation();
+              form.setValue(name, filtered[0], { shouldDirty: true });
+              setQuery(filtered[0]);
+              setOpen(false);
+            }
+          }}
         />
       )} />
       {error && <p className="text-red-500 text-xs mt-0.5">{error}</p>}
@@ -812,6 +821,14 @@ function SuggestionField({ form, name, label, fetchField, disabled, required, er
           onChange={e => { field.onChange(e.target.value); setOpen(true); }}
           onFocus={() => { if (currentValue.length >= 3) setOpen(true); }}
           onBlur={() => setTimeout(() => setOpen(false), 100)}
+          onKeyDown={e => {
+            if (e.key === "Enter" && open && filtered.length === 1) {
+              e.preventDefault();
+              e.stopPropagation();
+              form.setValue(name, filtered[0], { shouldDirty: true });
+              setOpen(false);
+            }
+          }}
         />
       )} />
       {error && <p className="text-red-500 text-xs mt-0.5">{error}</p>}
