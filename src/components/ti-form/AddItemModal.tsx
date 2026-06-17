@@ -149,6 +149,15 @@ export function AddItemModal({ open, onOpenChange, itemNo, onSuccess }: {
                       onFocus={() => setCtTypeOpen(true)}
                       onBlur={() => setTimeout(() => setCtTypeOpen(false), 100)}
                       onChange={e => { field.onChange(e.target.value); setCtQuery(e.target.value); setCtTypeOpen(true); }}
+                      onKeyDown={e => {
+                        if (e.key === "Enter" && ctTypeOpen && filteredCtTypes.length === 1) {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          form.setValue("ct_type", filteredCtTypes[0]);
+                          setCtQuery(filteredCtTypes[0]);
+                          setCtTypeOpen(false);
+                        }
+                      }}
                     />
                   )} />
                   {ctTypeOpen && filteredCtTypes.length > 0 && (
