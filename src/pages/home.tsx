@@ -85,6 +85,8 @@ export default function Home() {
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
   const [isAddItemModalOpen, setIsAddItemModalOpen] = useState(false);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const itemNoInputRef = useRef<HTMLInputElement>(null);
+  const itemLoadScrollRef = useRef<number | null>(null);
 
   // Debounced TI number for duplicate checking
   const [debouncedTiNo, setDebouncedTiNo] = useState("");
@@ -168,6 +170,14 @@ export default function Home() {
         // Pre-fill customer if found, but user can override
         customer_name: historicCustomer || current.customer_name || "",
       });
+      if (itemLoadScrollRef.current !== null) {
+        const scrollY = itemLoadScrollRef.current;
+        itemLoadScrollRef.current = null;
+        requestAnimationFrame(() => {
+          itemNoInputRef.current?.focus({ preventScroll: true });
+          window.scrollTo({ top: scrollY, left: window.scrollX, behavior: "auto" });
+        });
+      }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [itemData]);
@@ -194,13 +204,21 @@ export default function Home() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tiRecordData]);
 
-  const handleItemSearch = () => {
+  const handleItemSearch = (preserveScroll = false) => {
     if (!itemNoInput.trim()) return;
+    if (preserveScroll) itemLoadScrollRef.current = window.scrollY;
     // Clean item number: pure numeric
     const cleaned = itemNoInput.replace(/[\s,\.]+/g, "").replace(/[^0-9]/g, "");
     setItemNoInput(cleaned);
     form.setValue("item_no", cleaned);
     setActiveItemNo(cleaned);
+  };
+
+  const handleItemNoKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    e.stopPropagation();
+    handleItemSearch(true);
   };
 
   // Form is always visually enabled — no grey overlay after save
@@ -326,6 +344,8 @@ export default function Home() {
     const target = e.target as HTMLElement;
     const tag = target.tagName.toLowerCase();
     if (tag !== "input" && tag !== "textarea" && tag !== "select") return;
+    const root = target.closest("#ti-form");
+    if (!root) return;
     const gridRow = target.dataset.gridRow !== undefined ? parseInt(target.dataset.gridRow) : null;
     const gridCol = target.dataset.gridCol !== undefined ? parseInt(target.dataset.gridCol) : null;
     if (gridRow !== null && gridCol !== null) {
@@ -334,7 +354,7 @@ export default function Home() {
       switch (e.key) {
         case "ArrowDown": case "Enter":
           if (e.key === "Enter" && gridRow === NUM_CORE_ROWS - 1) {
-            document.querySelector<HTMLElement>('[data-field="ct_final_dim"]')?.focus(); return;
+            root.querySelector<HTMLElement>('[data-field="ct_final_dim"]')?.focus(); return;
           }
           nr = Math.min(gridRow + 1, NUM_CORE_ROWS - 1); break;
         case "ArrowUp": nr = Math.max(gridRow - 1, 0); break;
@@ -345,14 +365,13 @@ export default function Home() {
           if (gridCol > 0) nc = gridCol - 1;
           else if (gridRow > 0) { nr = gridRow - 1; nc = NUM_CORE_COLS - 1; } break;
       }
-      document.querySelector<HTMLElement>(`[data-grid-row="${nr}"][data-grid-col="${nc}"]`)?.focus();
+      root.querySelector<HTMLElement>(`[data-grid-row="${nr}"][data-grid-col="${nc}"]`)?.focus();
     } else {
-      const root = target.closest("#ti-form");
-      if (!root) return;
       const all = Array.from(root.querySelectorAll<HTMLElement>("input:not([disabled]), select:not([disabled]), textarea:not([disabled])"));
       const idx = all.indexOf(target);
       if (idx === -1) return;
-      const isNext = e.key === "ArrowDown" || e.key === "ArrowRight" || e.key === "Enter";
+      if (e.key === "Enter") return;
+      const isNext = e.key === "ArrowDown" || e.key === "ArrowRight";
       const isPrev = e.key === "ArrowUp" || e.key === "ArrowLeft";
       if (isNext && idx < all.length - 1) { e.preventDefault(); all[idx + 1].focus(); }
       if (isPrev && idx > 0) { e.preventDefault(); all[idx - 1].focus(); }
@@ -414,14 +433,14 @@ export default function Home() {
             <div className="bg-blue-50 border border-blue-100 p-4 rounded-md">
               <Label className="text-lg font-bold text-[#2a4080] mb-2 block">Item Number</Label>
               <div className="flex space-x-2">
-                <Input value={itemNoInput}
+                <Input ref={itemNoInputRef} value={itemNoInput}
                   onChange={e => { setItemNoInput(e.target.value); form.setValue("item_no", e.target.value); }}
-                  onBlur={handleItemSearch}
-                  onKeyDown={e => e.key === "Enter" && handleItemSearch()}
+                  onBlur={() => handleItemSearch()}
+                  onKeyDown={handleItemNoKeyDown}
                   placeholder="Enter numeric item number..."
                   className="text-lg py-6 max-w-sm border-[#4a6fa5] focus-visible:ring-[#4a6fa5]"
                   disabled={!isNewMode && !isEditMode} />
-                <Button onClick={handleItemSearch} className="bg-[#4a6fa5] hover:bg-[#3b5fc0] h-auto px-6"
+                <Button onClick={() => handleItemSearch()} className="bg-[#4a6fa5] hover:bg-[#3b5fc0] h-auto px-6"
                   disabled={!isNewMode && !isEditMode}>Load Item</Button>
               </div>
               {isItemError && <p className="text-red-500 text-sm mt-2 font-medium">Item not found. Please add it.</p>}
