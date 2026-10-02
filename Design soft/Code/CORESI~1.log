@@ -1,0 +1,7 @@
+Line 176: Class MSFlexGridLib.MSFlexGrid of control Grid was not a loaded control class.
+Line 259: Class MSForms.CommandButton of control cmdmod was not a loaded control class.
+Line 278: Class MSForms.CommandButton of control cmdcancel was not a loaded control class.
+Line 297: Class MSForms.CommandButton of control cmdsave was not a loaded control class.
+Line 316: Class MSForms.CommandButton of control cmdadd was not a loaded control class.
+Line 354: Class MSForms.CommandButton of control cmdin was not a loaded control class.
+Line 373: Class MSForms.CommandButton of control cmddelete was not a loaded control class.
